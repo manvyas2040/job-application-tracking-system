@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-SECRET_KEY = "change-me-in-production"
+SECRET_KEY = '197b2c37c391bed93fe80344fe73b806947a65e36206e05a1a23c2fa12702fe3'
 ALGORITHM = "HS256"
 ACCESS_TOKEN_MINUTES = 30
 REFRESH_TOKEN_DAYS = 7

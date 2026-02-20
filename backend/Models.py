@@ -40,24 +40,10 @@ class Candidate(Base):
     applications = relationship("Application", back_populates="candidate")
     notifications = relationship("CandidateNotification", back_populates="candidate_profile")
 
-
-class Company(Base):
-    __tablename__ = "companies"
-
-    company_id = Column(Integer, primary_key=True, index=True)
-    company_name = Column(String, nullable=False)
-    industry = Column(String, nullable=True)
-    location = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    jobs = relationship("Job", back_populates="company")
-
-
 class Job(Base):
     __tablename__ = "jobs"
 
     job_id = Column(Integer, primary_key=True, index=True)
-    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
     owner_hr_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
     job_titel = Column(String, nullable=False)
     job_description = Column(Text, nullable=False)
@@ -67,7 +53,7 @@ class Job(Base):
     posted_date = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    company = relationship("Company", back_populates="jobs")
+   
     applications = relationship("Application", back_populates="job")
 
 

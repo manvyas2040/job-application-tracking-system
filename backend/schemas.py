@@ -76,34 +76,12 @@ class CandidateUpdate(BaseModel):
     resume_path: Optional[str] = None
 
 
-class CompanyBase(BaseModel):
-    company_name: str
-    industry: Optional[str] = None
-    location: Optional[str] = None
 
-
-class CompanyCreate(CompanyBase):
-    pass
-
-
-class CompanyResponse(CompanyBase):
-    company_id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class CompanyUpdate(BaseModel):
-    company_name: Optional[str] = None
-    industry: Optional[str] = None
-    location: Optional[str] = None
 
 
 class JobBase(BaseModel):
     job_title: str
     job_description: str
-    company_id: int
     department: Optional[str] = None
     experience_required: Optional[int] = None
     job_status: str = "open"

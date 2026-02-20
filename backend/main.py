@@ -1,8 +1,6 @@
 from datetime import datetime
-
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from sqlalchemy.orm import Session
-
 from .authentication import (
     create_access_token,
     create_refresh_token,
@@ -14,6 +12,7 @@ from .authentication import (
 from .authorize import enforce_owner_or_admin, enforce_self_or_admin, require_roles
 from .Database import Base, engine, get_db
 from .Models import (
+    User,
     Application,
     AuditLog,
     Candidate,
@@ -21,7 +20,6 @@ from .Models import (
     Interview,
     InterviewFeedback,
     Job,
-    User,
 )
 from .schemas import (
     ApplicationCreate,
@@ -39,9 +37,10 @@ from .schemas import (
     UserLogin,
     UserUpdate,
 )
+from fastapi.security import OAuth2PasswordRequestForm
 
-app = FastAPI(title="Intermediate Job Application Tracking System")
-
+app = FastAPI(title="Job Application Tracking System")
+Base.metadata.create_all(bind=engine)   
 JOB_TRANSITIONS = {
     "draft": {"open", "archived"},
     "open": {"closed"},
@@ -113,19 +112,35 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
 
 
 @app.post("/auth/login")
-def login(payload: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
-    if not user or not verify_password(payload.password, user.password):
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(
+        User.email == form_data.username
+    ).first()
+
+    if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
     if user.status != "active" or not user.is_active:
-        raise HTTPException(status_code=403, detail="Login blocked for this account state")
+        raise HTTPException(
+            status_code=403,
+            detail="Login blocked for this account state"
+        )
 
     return {
-        "access_token": create_access_token(user.user_id, user.role, user.token_version),
-        "refresh_token": create_refresh_token(user.user_id, user.token_version),
+        "access_token": create_access_token(
+            user.user_id,
+            user.role,
+            user.token_version
+        ),
+        "refresh_token": create_refresh_token(
+            user.user_id,
+            user.token_version
+        ),
         "token_type": "bearer",
     }
-
 
 @app.post("/auth/refresh")
 def refresh(payload: TokenRefreshRequest, db: Session = Depends(get_db)):
@@ -241,7 +256,6 @@ def create_job(payload: JobCreate, current=Depends(get_current_user), db: Sessio
     actor = _current_db_user(current, db)
     require_roles("hr", "admin")(current)
     row = Job(
-        company_id=payload.company_id,
         owner_hr_id=actor.user_id,
         job_titel=payload.job_title,
         job_description=payload.job_description,
