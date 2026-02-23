@@ -1,20 +1,23 @@
-from pydantic import BaseModel,EmailStr,Field
 from datetime import datetime
-from typing import Optional,List
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
 
 class UserBase(BaseModel):
     name: str
-    email: EmailStr
-    role: str  
+    email: str
+    role: str
     status: str = "active"
 
-    
+
 class UserCreate(UserBase):
     password: str
 
 
 class UserResponse(UserBase):
     user_id: int
+    is_active: bool = True
     created_at: datetime
 
     class Config:
@@ -22,15 +25,28 @@ class UserResponse(UserBase):
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     role: Optional[str] = None
     status: Optional[str] = None
+
+
+class RoleChangeRequest(BaseModel):
+    new_role: str
+
+
+class TokenRefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class PasswordChangeRequest(BaseModel):
+    old_password: str
+    new_password: str
 
 
 class CandidateBase(BaseModel):
@@ -114,14 +130,18 @@ class JobUpdate(BaseModel):
     job_status: Optional[str] = None
 
 
+class JobStateUpdate(BaseModel):
+    job_status: str
+
+
 class ApplicationBase(BaseModel):
     candidate_id: int
     job_id: int
     application_status: str = "applied"
 
 
-class ApplicationCreate(ApplicationBase):
-    pass
+class ApplicationCreate(BaseModel):
+    job_id: int
 
 
 class ApplicationResponse(ApplicationBase):
@@ -137,6 +157,10 @@ class ApplicationUpdate(BaseModel):
     application_status: str
 
 
+class BulkStatusUpdate(BaseModel):
+    application_ids: List[int]
+
+
 class ApplicationDetailResponse(ApplicationResponse):
     candidate: Optional["CandidateResponse"] = None
     job: Optional["JobResponse"] = None
@@ -150,8 +174,11 @@ class InterviewBase(BaseModel):
     interview_status: str = "scheduled"
 
 
-class InterviewCreate(InterviewBase):
-    pass
+class InterviewCreate(BaseModel):
+    application_id: int
+    interview_date: datetime
+    interview_type: str
+    interviewer_id: int
 
 
 class InterviewResponse(InterviewBase):
@@ -172,9 +199,9 @@ class InterviewUpdate(BaseModel):
 class InterviewFeedbackBase(BaseModel):
     interview_id: int
     interviewer_id: int
-    rating: Optional[float] =Field(gt=0,lt=6,default=None)  
+    rating: Optional[float] = Field(gt=0, lt=6, default=None)
     comments: Optional[str] = None
-    recommendation: Optional[str] = None  
+    recommendation: Optional[str] = None
 
 
 class InterviewFeedbackCreate(InterviewFeedbackBase):
@@ -209,6 +236,7 @@ class CandidateNotificationCreate(BaseModel):
 
 class CandidateNotificationResponse(CandidateNotificationBase):
     notification_id: int
+    notification_type: str = "info"
     created_at: datetime
 
     class Config:
@@ -217,7 +245,6 @@ class CandidateNotificationResponse(CandidateNotificationBase):
 
 class CandidateNotificationUpdate(BaseModel):
     is_read: bool
-
 
 
 class AuditLogBase(BaseModel):
@@ -237,7 +264,6 @@ class AuditLogResponse(AuditLogBase):
 
     class Config:
         from_attributes = True
-
 
 
 class InterviewDetailResponse(InterviewResponse):
