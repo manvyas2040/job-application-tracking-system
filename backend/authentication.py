@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
-
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -11,17 +11,24 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_MINUTES = 30
 REFRESH_TOKEN_DAYS = 7
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
+     try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+     except ValueError:
+        return False
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
+        password_bytes = password.encode("utf-8")
+        if len(password_bytes) > 72:
+         raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is too long. Please use 72 bytes or fewer.",
+        )
+        return bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode("utf-8")
 
 def _create_token(subject: str, token_type: str, expires_delta: timedelta, extra: Dict[str, Any] | None = None) -> str:
     now = datetime.now(timezone.utc)

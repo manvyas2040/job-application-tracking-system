@@ -36,6 +36,7 @@ from .schemas import (
     UserCreate,
     UserLogin,
     UserUpdate,
+    CandidateUpdate,
 )
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -78,6 +79,7 @@ def _current_db_user(current: dict, db: Session) -> User:
 
 def _audit(db: Session, user_id: int, action: str):
     db.add(AuditLog(user_id=user_id, action=action))
+    db.commit()
 
 
 def _notify(db: Session, candidate_id: int, message: str, notification_type: str = "info", app_id: int | None = None):
@@ -101,7 +103,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
         email=payload.email,
         password=hash_password(payload.password),
         role=payload.role,
-        status="pending",
+        status="active", # i do now all user is active , after testing i do only admin is active and HR or candidate is pending for security purpose
         is_active=True,
         token_version=1,
     )
@@ -199,11 +201,6 @@ def update_user(user_id: int, payload: UserUpdate, current=Depends(get_current_u
     _current_db_user(current, db)
     enforce_self_or_admin(current, user_id)
     user = _get_user(db, user_id)
-
-    if payload.name is not None:
-        user.name = payload.name
-    if payload.email is not None:
-        user.email = payload.email
     if payload.status is not None:
         require_roles("admin")(current)
         user.status = payload.status
@@ -251,10 +248,67 @@ def restore_user(user_id: int, current=Depends(get_current_user), db: Session = 
     return {"message": "User restored"}
 
 
+@app.post("/candidate/profile")
+def create_candidate_profile(payload: CandidateUpdate, current=Depends(get_current_user), db: Session = Depends(get_db)):
+    user = _current_db_user(current, db)
+    require_roles("candidate")(current)
+
+    profile = db.query(Candidate).filter(Candidate.user_id == user.user_id).first()
+    if profile:
+        raise HTTPException(status_code=400, detail="Candidate profile already exists")
+
+    profile = Candidate(
+        user_id=user.user_id,
+        phone=payload.phone,
+        skills=payload.skills,
+        experience_year=payload.experience_years,
+        resume_path=payload.resume_path,
+    )
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+@app.patch("/candidate/profile")
+def update_candidate_profile(payload: CandidateUpdate, current=Depends(get_current_user), db: Session = Depends(get_db)):
+    user = _current_db_user(current, db)
+    require_roles("candidate")(current)
+
+    profile = db.query(Candidate).filter(Candidate.user_id == user.user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Candidate profile not found")
+
+    if payload.phone is not None:
+        profile.phone = payload.phone
+    if payload.skills is not None:
+        profile.skills = payload.skills
+    if payload.experience_years is not None:
+        profile.experience_year = payload.experience_years
+    if payload.resume_path is not None:
+        profile.resume_path = payload.resume_path
+
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+@app.get("/candidate/profile")
+def get_candidate_profile(current=Depends(get_current_user), db: Session = Depends(get_db)):
+    user = _current_db_user(current, db)
+    require_roles("candidate")(current)
+
+    profile = db.query(Candidate).filter(Candidate.user_id == user.user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Candidate profile not found")
+    return profile
+
+
+
 @app.post("/jobs")
 def create_job(payload: JobCreate, current=Depends(get_current_user), db: Session = Depends(get_db)):
     actor = _current_db_user(current, db)
-    require_roles("hr", "admin")(current)
+    require_roles("HR", "admin")(current)
     row = Job(
         owner_hr_id=actor.user_id,
         job_titel=payload.job_title,
@@ -295,7 +349,7 @@ def update_job_state(job_id: int, payload: JobStateUpdate, current=Depends(get_c
 @app.get("/jobs/{job_id}/analytics")
 def job_analytics(job_id: int, current=Depends(get_current_user), db: Session = Depends(get_db)):
     _current_db_user(current, db)
-    require_roles("hr", "admin")(current)
+    require_roles("HR", "admin")(current)
 
     app_count = db.query(Application).filter(Application.job_id == job_id).count()
     interview_count = (
@@ -399,7 +453,7 @@ def bulk_reject(payload: BulkStatusUpdate, current=Depends(get_current_user), db
 @app.post("/interviews")
 def create_interview(payload: InterviewCreate, current=Depends(get_current_user), db: Session = Depends(get_db)):
     _current_db_user(current, db)
-    require_roles("hr", "admin")(current)
+    require_roles("HR", "admin")(current)
 
     app_row = db.query(Application).filter(Application.application_id == payload.application_id).first()
     if not app_row:
@@ -504,7 +558,7 @@ def mark_read(notification_id: int, current=Depends(get_current_user), db: Sessi
         raise HTTPException(status_code=404, detail="Notification not found")
     row.is_read = True
     db.commit()
-    return {"message": "Notification marked as read"}
+    return {"message": "Notification marked as read"} ,db.query(CandidateNotification).filter(CandidateNotification.notification_id==notification_id).first()
 
 
 @app.get("/audit-logs")

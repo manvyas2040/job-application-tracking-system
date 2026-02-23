@@ -1,4 +1,5 @@
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status ,Depends
+from .main import get_current_user
 
 
 def require_roles(*roles: str):
@@ -8,6 +9,21 @@ def require_roles(*roles: str):
         return current_user
 
     return checker
+
+# def require_roles(*roles: str):
+#     allowed_roles = {r.strip().lower() for r in roles}
+
+#     def checker(current_user = Depends(get_current_user)):
+#         role = getattr(current_user, "role", None)
+
+#         if not role or role.lower() not in allowed_roles:
+#             raise HTTPException(
+#                 status_code=status.HTTP_403_FORBIDDEN,
+#                 detail="Insufficient permissions"
+#             )
+#         return current_user
+
+#     return checker
 
 
 def enforce_self_or_admin(current_user: dict, target_user_id: int) -> None:
