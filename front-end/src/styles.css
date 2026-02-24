@@ -1,30 +1,80 @@
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  color: #0f172a;
-  background: #f8fafc;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  color: #e2e8f0;
+  background: #0b1020;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
 }
 
-.layout {
-  padding: 24px;
-  max-width: 1100px;
+.appShell {
+  min-height: 100vh;
+  padding: 18px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
   gap: 16px;
+  margin-bottom: 16px;
+}
+
+.topbar h1 {
+  margin: 0;
 }
 
 .card {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  background: linear-gradient(180deg, #131a32, #0f152a);
+  border: 1px solid #28314f;
+  border-radius: 12px;
   padding: 16px;
+}
+
+.badge {
+  background: #1d4ed8;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.authPanel {
+  margin-top: 16px;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: start;
+}
+
+.sidebar button.active {
+  background: #0ea5e9;
+}
+
+.content {
+  min-height: 70vh;
 }
 
 .stack {
@@ -36,19 +86,65 @@ body {
 .row {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-input {
+.between {
+  justify-content: space-between;
+}
+
+.tableWrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border-bottom: 1px solid #28314f;
+  text-align: left;
+  padding: 8px;
+}
+
+.auditList {
+  max-height: 220px;
+  overflow: auto;
+}
+
+input,
+button,
+select {
   padding: 10px;
   border-radius: 8px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #334155;
+}
+
+input,
+select {
+  background: #0b1229;
+  color: #f8fafc;
 }
 
 button {
-  padding: 10px 14px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
   background: #2563eb;
   color: white;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.1);
+}
+
+@media (max-width: 900px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
 }
