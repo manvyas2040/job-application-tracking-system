@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .authentication import (
@@ -63,6 +64,15 @@ INTERVIEW_TRANSITIONS = {
     "cancelled": set(),
 }
 
+ALLOWED_ROLES = {"admin", "hr", "candidate", "interviewer"}
+
+
+def _normalize_role(role: str) -> str:
+    normalized = role.strip().lower()
+    if normalized not in ALLOWED_ROLES:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    return normalized
+
 
 def _get_user(db: Session, user_id: int) -> User:
     row = db.query(User).filter(User.user_id == user_id).first()
@@ -98,14 +108,16 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Email already exists")
 
-    admin_exists = db.query(User).filter(User.role == "admin").first() is not None
-    is_first_admin = payload.role == "admin" and not admin_exists
+    role = _normalize_role(payload.role)
+
+    admin_exists = db.query(User).filter(func.lower(User.role) == "admin").first() is not None
+    is_first_admin = role == "admin" and not admin_exists
 
     user = User(
         name=payload.name,
         email=payload.email,
         password=hash_password(payload.password),
-        role=payload.role,
+        role=role,
         status="active" if is_first_admin else "pending",
         is_active=True,
         token_version=1,
@@ -177,7 +189,7 @@ def list_users(
 
     q = db.query(User).filter(User.is_active.is_(True))
     if role:
-        q = q.filter(User.role == role)
+        q = q.filter(func.lower(User.role) == role.lower())
     if status_filter:
         q = q.filter(User.status == status_filter)
     total = q.count()
@@ -210,9 +222,10 @@ def change_role(user_id: int, payload: RoleChangeRequest, current=Depends(get_cu
     actor = _current_db_user(current, db)
     user = _get_user(db, user_id)
     old = user.role
-    user.role = payload.new_role
+    new_role = _normalize_role(payload.new_role)
+    user.role = new_role
     user.token_version += 1
-    _audit(db, actor.user_id, f"role_changed:{user_id}:{old}->{payload.new_role}")
+    _audit(db, actor.user_id, f"role_changed:{user_id}:{old}->{new_role}")
     db.commit()
     return {"message": "Role changed"}
 
@@ -390,12 +403,12 @@ def apply_job(payload: ApplicationCreate, current=Depends(get_current_user), db:
 @app.get("/applications")
 def list_applications(current=Depends(get_current_user), db: Session = Depends(get_db)):
     user = _current_db_user(current, db)
-    if user.role == "admin":
+    if (user.role or "").lower() == "admin":
         return db.query(Application).all()
-    if user.role == "candidate":
+    if (user.role or "").lower() == "candidate":
         c = db.query(Candidate).filter(Candidate.user_id == user.user_id).first()
         return db.query(Application).filter(Application.candidate_id == c.candidate_id).all() if c else []
-    if user.role == "hr":
+    if (user.role or "").lower() == "hr":
         return (
             db.query(Application)
             .join(Job, Application.job_id == Job.job_id)
