@@ -1,5 +1,6 @@
 from datetime import datetime
 from fastapi import Depends, FastAPI, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from .authentication import (
     create_access_token,
@@ -62,6 +63,13 @@ INTERVIEW_TRANSITIONS = {
     "cancelled": set(),
 }
 
+ALLOWED_ROLES = {"admin", "hr", "candidate", "interviewer"}
+
+def _normalize_role(role: str) -> str:
+    normalized = role.strip().lower()
+    if normalized not in ALLOWED_ROLES:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    return normalized
 
 def _get_user(db: Session, user_id: int) -> User:
     row = db.query(User).filter(User.user_id == user_id).first()
@@ -92,17 +100,24 @@ def _notify(db: Session, candidate_id: int, message: str, notification_type: str
         )
     )
 
+#                         create  a user
 
 @app.post("/auth/register")
 def register(payload: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Email already exists")
+     
+    role = _normalize_role(payload.role)
+
+    admin_exists = db.query(User).filter(func.lower(User.role) == "admin").first() is not None
+    is_first_admin = role == "admin" and not admin_exists
+
 
     user = User(
         name=payload.name,
         email=payload.email,
         password=hash_password(payload.password),
-        role=payload.role,
+        role=role,
         status="active", # i do now all user is active , after testing i do only admin is active and HR or candidate is pending for security purpose
         is_active=True,
         token_version=1,
@@ -112,35 +127,24 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     db.refresh(user)
     return {"user_id": user.user_id, "status": user.status}
 
+#           this is full user functionality 
 
 @app.post("/auth/login")
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(
-        User.email == form_data.username
-    ).first()
+    user = db.query(User).filter(User.email == form_data.username).first()
 
     if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if user.status != "active" or not user.is_active:
-        raise HTTPException(
-            status_code=403,
-            detail="Login blocked for this account state"
-        )
+        raise HTTPException(status_code=403,detail="Login blocked for this account state")
 
     return {
-        "access_token": create_access_token(
-            user.user_id,
-            user.role,
-            user.token_version
-        ),
-        "refresh_token": create_refresh_token(
-            user.user_id,
-            user.token_version
-        ),
+        "access_token": create_access_token(user.user_id,user.role,user.token_version),
+        "refresh_token": create_refresh_token(user.user_id,user.token_version),
         "token_type": "bearer",
     }
 
@@ -202,7 +206,7 @@ def update_user(user_id: int, payload: UserUpdate, current=Depends(get_current_u
     enforce_self_or_admin(current, user_id)
     user = _get_user(db, user_id)
     if payload.status is not None:
-        require_roles("admin")(current)
+        require_roles("ADMIN")(current)
         user.status = payload.status
 
     db.commit()
@@ -212,16 +216,16 @@ def update_user(user_id: int, payload: UserUpdate, current=Depends(get_current_u
 
 @app.post("/users/{user_id}/role")
 def change_role(user_id: int, payload: RoleChangeRequest, current=Depends(get_current_user), db: Session = Depends(get_db)):
-    require_roles("admin")(current)
+    require_roles("ADMIN")(current)
     actor = _current_db_user(current, db)
     user = _get_user(db, user_id)
     old = user.role
-    user.role = payload.new_role
+    new_role = _normalize_role(payload.new_role)
+    user.role = new_role
     user.token_version += 1
-    _audit(db, actor.user_id, f"role_changed:{user_id}:{old}->{payload.new_role}")
+    _audit(db, actor.user_id, f"role_changed:{user_id}:{old}->{new_role}")
     db.commit()
     return {"message": "Role changed"}
-
 
 @app.delete("/users/{user_id}")
 def deactivate_user(user_id: int, current=Depends(get_current_user), db: Session = Depends(get_db)):
@@ -247,6 +251,7 @@ def restore_user(user_id: int, current=Depends(get_current_user), db: Session = 
     db.commit()
     return {"message": "User restored"}
 
+#   this is full candidate functionality
 
 @app.post("/candidate/profile")
 def create_candidate_profile(payload: CandidateUpdate, current=Depends(get_current_user), db: Session = Depends(get_db)):
@@ -292,23 +297,12 @@ def update_candidate_profile(payload: CandidateUpdate, current=Depends(get_curre
     db.refresh(profile)
     return profile
 
-
-@app.get("/candidate/profile")
-def get_candidate_profile(current=Depends(get_current_user), db: Session = Depends(get_db)):
-    user = _current_db_user(current, db)
-    require_roles("candidate")(current)
-
-    profile = db.query(Candidate).filter(Candidate.user_id == user.user_id).first()
-    if not profile:
-        raise HTTPException(status_code=404, detail="Candidate profile not found")
-    return profile
-
-
+# this is full jobs functionality 
 
 @app.post("/jobs")
 def create_job(payload: JobCreate, current=Depends(get_current_user), db: Session = Depends(get_db)):
     actor = _current_db_user(current, db)
-    require_roles("HR", "admin")(current)
+    require_roles("hr", "admin")(current)
     row = Job(
         owner_hr_id=actor.user_id,
         job_titel=payload.job_title,
@@ -349,7 +343,7 @@ def update_job_state(job_id: int, payload: JobStateUpdate, current=Depends(get_c
 @app.get("/jobs/{job_id}/analytics")
 def job_analytics(job_id: int, current=Depends(get_current_user), db: Session = Depends(get_db)):
     _current_db_user(current, db)
-    require_roles("HR", "admin")(current)
+    require_roles("hr", "admin")(current)
 
     app_count = db.query(Application).filter(Application.job_id == job_id).count()
     interview_count = (
@@ -360,6 +354,7 @@ def job_analytics(job_id: int, current=Depends(get_current_user), db: Session = 
     )
     return {"job_id": job_id, "applications": app_count, "interviews": interview_count}
 
+#  this is full applications functionality 
 
 @app.post("/applications")
 def apply_job(payload: ApplicationCreate, current=Depends(get_current_user), db: Session = Depends(get_db)):
@@ -449,6 +444,7 @@ def bulk_reject(payload: BulkStatusUpdate, current=Depends(get_current_user), db
         update_application_state(app_id, ApplicationUpdate(application_status="rejected"), current, db)
     return {"updated": len(payload.application_ids)}
 
+# this is full interviews functionality 
 
 @app.post("/interviews")
 def create_interview(payload: InterviewCreate, current=Depends(get_current_user), db: Session = Depends(get_db)):
@@ -559,10 +555,83 @@ def mark_read(notification_id: int, current=Depends(get_current_user), db: Sessi
     row.is_read = True
     db.commit()
     return {"message": "Notification marked as read"} ,db.query(CandidateNotification).filter(CandidateNotification.notification_id==notification_id).first()
-
+                                    
 
 @app.get("/audit-logs")
 def audit_logs(current=Depends(get_current_user), db: Session = Depends(get_db)):
     require_roles("admin")(current)
     _current_db_user(current, db)
     return db.query(AuditLog).order_by(AuditLog.timestamp.desc()).all()
+
+# SEARCH & FILTERS
+
+@app.get("/applications/search")
+def search_applications(
+    status: str | None = None,
+    job_id: int | None = None,
+    page: int = 1,
+    limit: int = 10,
+    current=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_roles("hr", "admin")(current)
+
+    query = db.query(Application)
+
+    if status:
+        query = query.filter(Application.application_status == status.lower())
+
+    if job_id:
+        query = query.filter(Application.job_id == job_id)
+
+    total = query.count()
+
+    results = (
+        query
+        .order_by(Application.applied_date.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "results": results
+    }
+
+@app.get("/candidates/search")
+def search_candidates(
+    skill: str | None = None,
+    min_exp: int | None = None,
+    page: int = 1,
+    limit: int = 10,
+    current=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    require_roles("hr", "admin")(current)
+
+    query = db.query(Candidate)
+
+    if skill:
+        query = query.filter(Candidate.skills.ilike(f"%{skill}%"))
+
+    if min_exp is not None:
+        query = query.filter(Candidate.experience_year >= min_exp)
+
+    total = query.count()
+
+    results = (
+        query
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "results": results
+    }
