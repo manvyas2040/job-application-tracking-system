@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Details - JATS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <h1>🎯 JATS</h1>
+            <div class="navbar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="jobs.html">Jobs</a>
+                <a href="applications.html">Applications</a>
+                <a href="profile.html" id="nav-profile" style="display:none;">Profile</a>
+                <a href="notifications.html" id="nav-notifications" style="display:none;">Notifications</a>
+                <a href="interviews.html" id="nav-interviews" style="display:none;">Interviews</a>
+                <a href="change-password.html">🔐 Change Password</a>
+                <a href="users.html" id="nav-users" style="display:none;">Users</a>
+                <div class="navbar-user">
+                    <span id="user-email" class="user-badge"></span>
+                    <span id="user-role" class="user-badge"></span>
+                    <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="dashboard">
+            <button class="btn btn-secondary btn-sm" onclick="window.history.back()" style="margin-bottom: 20px;">
+                ← Back
+            </button>
+
+            <div id="application-detail-container">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Application Status Modal -->
+    <div id="change-status-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Change Application Status</h2>
+                <button class="close-btn" onclick="closeModal('change-status-modal')">&times;</button>
+            </div>
+            <form onsubmit="changeApplicationStatus(event)">
+                <input type="hidden" id="change-app-id">
+                <div class="form-group">
+                    <label>New Status *</label>
+                    <select id="new-status" required>
+                        <option value="">Select Status</option>
+                    </select>
+                </div>
+                <div class="error-message" id="status-error"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary">Change Status</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('change-status-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Schedule Interview Modal -->
+    <div id="schedule-interview-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Schedule Interview</h2>
+                <button class="close-btn" onclick="closeModal('schedule-interview-modal')">&times;</button>
+            </div>
+            <form onsubmit="scheduleInterviewFromApp(event)">
+                <input type="hidden" id="schedule-app-id">
+                <div class="form-group">
+                    <label>Interview Date & Time *</label>
+                    <input type="datetime-local" id="schedule-interview-date" required>
+                </div>
+                <div class="form-group">
+                    <label>Interview Type *</label>
+                    <select id="schedule-interview-type" required>
+                        <option value="technical">Technical</option>
+                        <option value="hr">HR Round</option>
+                        <option value="managerial">Managerial</option>
+                        <option value="cultural">Cultural Fit</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Select Interviewer *</label>
+                    <select id="schedule-interviewer-id" required onchange="loadInterviewersList()">
+                        <option value="">Loading interviewers...</option>
+                    </select>
+                </div>
+                <div class="error-message" id="schedule-error"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-success">Schedule Interview</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('schedule-interview-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reschedule Interview Modal -->
+    <div id="reschedule-interview-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Reschedule Interview</h2>
+                <button class="close-btn" onclick="closeModal('reschedule-interview-modal')">&times;</button>
+            </div>
+            <form onsubmit="rescheduleInterviewFromApp(event)">
+                <input type="hidden" id="reschedule-interview-id">
+                <div class="form-group">
+                    <label>New Date & Time *</label>
+                    <input type="datetime-local" id="reschedule-new-date" required>
+                </div>
+                <div class="form-group">
+                    <label>Interview Type (Optional)</label>
+                    <select id="reschedule-interview-type">
+                        <option value="">Keep Current Type</option>
+                        <option value="technical">Technical</option>
+                        <option value="hr">HR Round</option>
+                        <option value="managerial">Managerial</option>
+                        <option value="cultural">Cultural Fit</option>
+                    </select>
+                </div>
+                <div class="error-message" id="reschedule-error"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary">Reschedule</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('reschedule-interview-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Interview Modal -->
+    <div id="delete-interview-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Cancel Interview</h2>
+                <button class="close-btn" onclick="closeModal('delete-interview-modal')">&times;</button>
+            </div>
+            <p style="color: var(--secondary); margin-bottom: 20px;">Are you sure you want to cancel this interview? The candidate will be notified.</p>
+            <div style="background: #fee; border: 1px solid #fcc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p id="delete-interview-info"></p>
+            </div>
+            <div class="error-message" id="delete-interview-error"></div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="confirmDeleteInterview()" class="btn btn-danger">Yes, Cancel Interview</button>
+                <button onclick="closeModal('delete-interview-modal')" class="btn btn-secondary">No, Keep It</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        requireAuth();
+        checkCandidateProfile();
+
+        const user = getUser();
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('user-role').textContent = user.role;
+
+        // Show role-based navigation
+        if (user.role === 'candidate') {
+            document.getElementById('nav-profile').style.display = 'inline-block';
+            document.getElementById('nav-notifications').style.display = 'inline-block';
+        }
+        if (user.role === 'hr' || user.role === 'admin' || user.role === 'interviewer') {
+            document.getElementById('nav-interviews').style.display = 'inline-block';
+        }
+        if (user.role === 'admin') {
+            document.getElementById('nav-users').style.display = 'inline-block';
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const applicationId = urlParams.get('id');
+
+        async function loadApplicationDetail() {
+            if (!applicationId) {
+                alert('No application ID provided');
+                window.history.back();
+                return;
+            }
+
+            const container = document.getElementById('application-detail-container');
+
+            try {
+                const applications = await apiCall('/applications');
+                const app = applications.find(a => a.application_id == applicationId);
+
+                if (!app) {
+                    container.innerHTML = '<p style="color:red; text-align:center; padding:40px;">Application not found</p>';
+                    return;
+                }
+
+                // Get job details
+                const job = await apiCall(`/jobs/${app.job_id}`);
+
+                // Get candidate details if HR/Admin/Interviewer
+                let candidateData = null;
+                if (user.role === 'hr' || user.role === 'admin' || user.role === 'interviewer') {
+                    try {
+                        candidateData = await apiCall(`/candidates/${app.candidate_id}/full-profile`);
+                    } catch (error) {
+                        console.log('Could not load candidate data:', error);
+                    }
+                }
+
+                const canChangeStatus = user.role === 'hr' || user.role === 'admin';
+                const canScheduleInterview = (user.role === 'hr' || user.role === 'admin') && 
+                                            (app.application_status === 'shortlisted');
+
+                container.innerHTML = `
+                    <div style="background: white; padding: 30px; border-radius: 12px; border: 2px solid var(--border);">
+                        <h2 style="margin-bottom: 10px;">Application #${app.application_id}</h2>
+                        <div style="display: flex; gap: 10px; margin-bottom: 30px;">
+                            <span class="badge badge-${app.application_status}">${app.application_status}</span>
+                            <span class="badge badge-draft">${new Date(app.applied_date).toLocaleDateString()}</span>
+                        </div>
+
+                        <!-- Application Info -->
+                        <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                            <h3>Application Information</h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                                <div>
+                                    <strong>Application ID:</strong> ${app.application_id}
+                                </div>
+                                <div>
+                                    <strong>Candidate ID:</strong> ${app.candidate_id}
+                                </div>
+                                <div>
+                                    <strong>Job ID:</strong> ${app.job_id}
+                                </div>
+                                <div>
+                                    <strong>Status:</strong>
+                                    <span class="badge badge-${app.application_status}" style="margin-left: 10px;">
+                                        ${app.application_status}
+                                    </span>
+                                </div>
+                                <div>
+                                    <strong>Applied Date:</strong> ${new Date(app.applied_date).toLocaleString()}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Job Info -->
+                        <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                            <h3>Job Details</h3>
+                            <div style="margin-top: 15px;">
+                                <div style="margin-bottom: 15px;">
+                                    <strong>Title:</strong> ${job.job_titel}
+                                </div>
+                                <div style="margin-bottom: 15px;">
+                                    <strong>Department:</strong> ${job.department}
+                                </div>
+                                <div style="margin-bottom: 15px;">
+                                    <strong>Experience Required:</strong> ${job.experienc_required} years
+                                </div>
+                                <div style="margin-bottom: 15px;">
+                                    <strong>Description:</strong>
+                                    <p style="white-space: pre-wrap; margin-top: 10px; color: var(--secondary);">
+                                        ${job.job_description}
+                                    </p>
+                                </div>
+                                <div>
+                                    <strong>Job Status:</strong> 
+                                    <span class="badge badge-${job.job_status}" style="margin-left: 10px;">
+                                        ${job.job_status}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Candidate Info (for HR/Admin/Interviewer) -->
+                        ${candidateData ? `
+                            <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                                <h3>Candidate Information</h3>
+                                <div style="margin-top: 15px;">
+                                    <div style="margin-bottom: 15px;">
+                                        <strong>Name:</strong> ${candidateData.user.name}
+                                    </div>
+                                    <div style="margin-bottom: 15px;">
+                                        <strong>Email:</strong> ${candidateData.user.email}
+                                    </div>
+                                    <div style="margin-bottom: 15px;">
+                                        <strong>Phone:</strong> ${candidateData.profile.phone}
+                                    </div>
+                                    <div style="margin-bottom: 15px;">
+                                        <strong>Skills:</strong><br>
+                                        <div style="margin-top: 10px;">
+                                            ${candidateData.profile.skills.split(',').map(skill => 
+                                                `<span class="badge badge-draft" style="margin: 5px;">${skill.trim()}</span>`
+                                            ).join('')}
+                                        </div>
+                                    </div>
+                                    <div style="margin-bottom: 15px;">
+                                        <strong>Experience:</strong> ${candidateData.profile.experience_years} years
+                                    </div>
+                                    <div>
+                                        <strong>Resume:</strong> ${candidateData.profile.resume_path || 'Not provided'}
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <!-- Interview Management (if exists or can schedule) -->
+                        ${app.application_status === 'interview_scheduled' && candidateData && candidateData.interviews && candidateData.interviews.length > 0 ? `
+                            <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                                <h3>Interview Details</h3>
+                                ${candidateData.interviews.map(interview => `
+                                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                                            <div>
+                                                <strong>Interview ID:</strong> ${interview.interview_id}
+                                            </div>
+                                            <div>
+                                                <strong>Date:</strong> ${new Date(interview.interview_date).toLocaleString()}
+                                            </div>
+                                            <div>
+                                                <strong>Type:</strong> ${interview.interview_type}
+                                            </div>
+                                            <div>
+                                                <strong>Status:</strong> <span class="badge badge-${interview.interview_status}">${interview.interview_status}</span>
+                                            </div>
+                                        </div>
+                                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                            ${(user.role === 'hr' || user.role === 'admin') && interview.interview_status === 'scheduled' ? `
+                                                <button class="btn btn-sm btn-primary" onclick="openRescheduleInterviewModal(${interview.interview_id}, '${interview.interview_date}')">
+                                                    Reschedule
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" onclick="openDeleteInterviewModal(${interview.interview_id}, '${interview.interview_date}')">
+                                                    Cancel Interview
+                                                </button>
+                                            ` : ''}
+                                            ${user.role === 'interviewer' && interview.interview_status === 'scheduled' ? `
+                                                <button class="btn btn-sm btn-primary" onclick="openRescheduleInterviewModal(${interview.interview_id}, '${interview.interview_date}')">
+                                                    Request Reschedule
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+
+                        <!-- Actions -->
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            ${canChangeStatus ? `
+                                <button class="btn btn-primary btn-sm" onclick="openChangeStatusModal(${app.application_id}, '${app.application_status}')">
+                                    Change Status
+                                </button>
+                            ` : ''}
+                            ${canScheduleInterview ? `
+                                <button class="btn btn-success btn-sm" onclick="openScheduleInterviewModal(${app.application_id})">
+                                    Schedule Interview
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-secondary btn-sm" onclick="window.history.back()">
+                                Back
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                container.innerHTML = `<p style="color:red; text-align:center; padding:40px;">Error: ${error.message}</p>`;
+            }
+        }
+
+        function openChangeStatusModal(appId, currentStatus) {
+            const statusSelect = document.getElementById('new-status');
+            const transitions = {
+                'applied': ['shortlisted', 'rejected'],
+                'shortlisted': ['interview_scheduled', 'rejected'],
+                'interview_scheduled': ['hired', 'rejected'],
+                'rejected': [],
+                'hired': []
+            };
+
+            const allowedStatuses = transitions[currentStatus] || [];
+            statusSelect.innerHTML = '<option value="">Select Status</option>' + 
+                allowedStatuses.map(s => `<option value="${s}">${s.replace('_', ' ').toUpperCase()}</option>`).join('');
+
+            document.getElementById('change-app-id').value = appId;
+            openModal('change-status-modal');
+        }
+
+        async function changeApplicationStatus(event) {
+            event.preventDefault();
+
+            const appId = document.getElementById('change-app-id').value;
+            const newStatus = document.getElementById('new-status').value;
+
+            hideError('status-error');
+
+            if (!newStatus) {
+                showError('status-error', 'Please select a status');
+                return;
+            }
+
+            try {
+                await apiCall(`/applications/${appId}/state`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ application_status: newStatus })
+                });
+
+                alert('Application status updated!');
+                closeModal('change-status-modal');
+                loadApplicationDetail();
+            } catch (error) {
+                showError('status-error', error.message);
+            }
+        }
+
+        function openScheduleInterviewModal(appId) {
+            document.getElementById('schedule-app-id').value = appId;
+            loadInterviewersList();
+            openModal('schedule-interview-modal');
+        }
+
+        async function loadInterviewersList() {
+            try {
+                const data = await apiCall('/users?role=interviewer&page_size=100');
+                const interviewers = data.items || [];
+                
+                const select = document.getElementById('schedule-interviewer-id');
+                select.innerHTML = '<option value="">Select Interviewer</option>' +
+                    interviewers.map(i => `<option value="${i.user_id}">${i.name} (${i.email})</option>`).join('');
+            } catch (error) {
+                console.error('Error loading interviewers:', error);
+                showError('schedule-error', 'Could not load interviewers list');
+            }
+        }
+
+        async function scheduleInterviewFromApp(event) {
+            event.preventDefault();
+
+            const appId = document.getElementById('schedule-app-id').value;
+            const interviewDate = document.getElementById('schedule-interview-date').value;
+            const interviewType = document.getElementById('schedule-interview-type').value;
+            const interviewerId = document.getElementById('schedule-interviewer-id').value;
+
+            hideError('schedule-error');
+
+            try {
+                await apiCall('/interviews', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        application_id: parseInt(appId),
+                        interview_date: interviewDate,
+                        interview_type: interviewType,
+                        interviewer_id: parseInt(interviewerId)
+                    })
+                });
+
+                alert('Interview scheduled successfully!');
+                closeModal('schedule-interview-modal');
+                loadApplicationDetail();
+            } catch (error) {
+                showError('schedule-error', error.message);
+            }
+        }
+
+        function openRescheduleInterviewModal(interviewId, currentDate) {
+            document.getElementById('reschedule-interview-id').value = interviewId;
+            if (currentDate) {
+                const dateObj = new Date(currentDate);
+                const isoString = dateObj.toISOString().slice(0, 16);
+                document.getElementById('reschedule-new-date').value = isoString;
+            }
+            openModal('reschedule-interview-modal');
+        }
+
+        async function rescheduleInterviewFromApp(event) {
+            event.preventDefault();
+
+            const interviewId = document.getElementById('reschedule-interview-id').value;
+            const newDate = document.getElementById('reschedule-new-date').value;
+            const newType = document.getElementById('reschedule-interview-type').value;
+
+            hideError('reschedule-error');
+
+            try {
+                await apiCall(`/interviews/${interviewId}/reschedule`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        interview_date: newDate,
+                        interview_type: newType || null
+                    })
+                });
+
+                alert('Interview rescheduled successfully! Candidate has been notified.');
+                closeModal('reschedule-interview-modal');
+                loadApplicationDetail();
+            } catch (error) {
+                showError('reschedule-error', error.message);
+            }
+        }
+
+        function openDeleteInterviewModal(interviewId, interviewDate) {
+            document.getElementById('delete-interview-info').innerHTML = 
+                `<strong>Interview ID:</strong> ${interviewId}<br><strong>Scheduled:</strong> ${new Date(interviewDate).toLocaleString()}`;
+            window.currentDeleteInterviewId = interviewId;
+            openModal('delete-interview-modal');
+        }
+
+        async function confirmDeleteInterview() {
+            const interviewId = window.currentDeleteInterviewId;
+            
+            try {
+                await apiCall(`/interviews/${interviewId}`, {
+                    method: 'DELETE'
+                });
+
+                alert('Interview cancelled successfully! Candidate has been notified.');
+                closeModal('delete-interview-modal');
+                loadApplicationDetail();
+            } catch (error) {
+                showError('delete-interview-error', error.message);
+            }
+        }
+
+        loadApplicationDetail();
+    </script>
+</body>
+</html>

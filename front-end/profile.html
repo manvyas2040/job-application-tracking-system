@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile - JATS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <h1>🎯 JATS</h1>
+            <div class="navbar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="jobs.html">Jobs</a>
+                <a href="applications.html">Applications</a>
+                <a href="profile.html">Profile</a>
+                <a href="notifications.html">
+                    Notifications <span id="notification-badge" class="badge" style="display:none; background:red; color:white; font-size:0.7rem; padding:2px 6px; border-radius:10px;">0</span>
+                </a>
+                <a href="change-password.html">🔐 Change Password</a>
+                <div class="navbar-user">
+                    <span id="user-email" class="user-badge"></span>
+                    <span id="user-role" class="user-badge"></span>
+                    <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="dashboard">
+            <h2>My Profile</h2>
+            
+            <div id="profile-status" class="stat-card" style="margin-bottom: 30px; display:none;">
+                <h3>⚠️ Profile Incomplete</h3>
+                <p>Complete your profile to apply for jobs</p>
+            </div>
+
+            <div id="profile-container">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        requireAuth();
+
+        const user = getUser();
+        if (user.role !== 'candidate') {
+            alert('Profile page is only for candidates');
+            window.location.href = 'dashboard.html';
+        }
+
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('user-role').textContent = user.role;
+
+        async function loadProfile() {
+            const container = document.getElementById('profile-container');
+
+            try {
+                // Try to get profile
+                const response = await fetch(`${API_URL}/candidate/profile`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.status === 404) {
+                    // Profile doesn't exist
+                    document.getElementById('profile-status').style.display = 'block';
+                    container.innerHTML = `
+                        <div style="text-align:center; padding:40px;">
+                            <p style="color: var(--secondary); margin-bottom:20px;">You haven't created your profile yet</p>
+                            <button class="btn btn-primary" onclick="window.location.href='create-profile.html'">
+                                Create Profile Now
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                if (!response.ok) throw new Error('Failed to load profile');
+
+                const profile = await response.json();
+
+                container.innerHTML = `
+                    <div style="background: white; padding: 30px; border-radius: 12px; border: 2px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                            <h3>Profile Details</h3>
+                            <button class="btn btn-primary btn-sm" onclick="openEditMode()">Edit Profile</button>
+                        </div>
+
+                        <div id="view-mode">
+                            <div style="margin-bottom: 20px;">
+                                <strong>Phone:</strong> ${profile.phone}
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <strong>Skills:</strong> 
+                                <div style="margin-top:10px;">
+                                    ${profile.skills.split(',').map(skill => 
+                                        `<span class="badge badge-draft" style="margin: 5px;">${skill.trim()}</span>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <strong>Experience:</strong> ${profile.experience_year} years
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <strong>Resume:</strong> ${profile.resume_path || 'Not provided'}
+                            </div>
+                        </div>
+
+                        <div id="edit-mode" style="display:none;">
+                            <form onsubmit="updateProfile(event)">
+                                <div class="form-group">
+                                    <label>Phone Number</label>
+                                    <input type="tel" id="edit-phone" value="${profile.phone}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Skills</label>
+                                    <textarea id="edit-skills" rows="3" required>${profile.skills}</textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Years of Experience</label>
+                                    <input type="number" id="edit-experience" value="${profile.experience_year}" required min="0" max="50">
+                                </div>
+                                <div class="form-group">
+                                    <label>Resume Path</label>
+                                    <input type="text" id="edit-resume" value="${profile.resume_path || ''}">
+                                </div>
+                                <div class="error-message" id="edit-error"></div>
+                                <div style="display:flex; gap:10px;">
+                                    <button type="submit" class="btn btn-success">Save Changes</button>
+                                    <button type="button" class="btn btn-secondary" onclick="cancelEdit()">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                `;
+
+                // Mark profile as complete
+                const updatedUser = { ...user, profile_complete: true };
+                setUser(updatedUser);
+
+            } catch (error) {
+                container.innerHTML = `<p style="color:red; text-align:center; padding:40px;">Error: ${error.message}</p>`;
+            }
+        }
+
+        function openEditMode() {
+            document.getElementById('view-mode').style.display = 'none';
+            document.getElementById('edit-mode').style.display = 'block';
+        }
+
+        function cancelEdit() {
+            document.getElementById('view-mode').style.display = 'block';
+            document.getElementById('edit-mode').style.display = 'none';
+            hideError('edit-error');
+        }
+
+        async function updateProfile(event) {
+            event.preventDefault();
+
+            const phone = document.getElementById('edit-phone').value;
+            const skills = document.getElementById('edit-skills').value;
+            const experience = parseInt(document.getElementById('edit-experience').value);
+            const resume = document.getElementById('edit-resume').value;
+
+            hideError('edit-error');
+
+            try {
+                await apiCall('/candidate/profile', {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        phone,
+                        skills,
+                        experience_years: experience,
+                        resume_path: resume || null
+                    })
+                });
+
+                alert('Profile updated successfully!');
+                loadProfile();
+            } catch (error) {
+                showError('edit-error', error.message);
+            }
+        }
+
+        loadProfile();
+    </script>
+</body>
+</html>

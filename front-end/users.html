@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users Management - JATS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <h1>🎯 JATS Admin</h1>
+            <div class="navbar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="jobs.html">Jobs</a>
+                <a href="users.html">Users</a>
+                <a href="audit-logs.html">Audit Logs</a>
+                <div class="navbar-user">
+                    <span id="user-email" class="user-badge"></span>
+                    <span id="user-role" class="user-badge"></span>
+                    <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="dashboard">
+            <h2>User Management</h2>
+            <p style="color: var(--secondary); margin-bottom: 20px;">Manage all users in the system</p>
+
+            <!-- Filters -->
+            <div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 2px solid var(--border);">
+                <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: end;">
+                    <div class="form-group" style="margin: 0; flex: 1; min-width: 200px;">
+                        <label>Filter by Role</label>
+                        <select id="role-filter" onchange="loadUsers()">
+                            <option value="">All Roles</option>
+                            <option value="admin">Admin</option>
+                            <option value="hr">HR</option>
+                            <option value="candidate">Candidate</option>
+                            <option value="interviewer">Interviewer</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0; flex: 1; min-width: 200px;">
+                        <label>Filter by Status</label>
+                        <select id="status-filter" onchange="loadUsers()">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="loadUsers()">Refresh</button>
+                </div>
+            </div>
+
+            <div id="users-container">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Role Modal -->
+    <div id="change-role-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Change User Role</h2>
+                <button class="close-btn" onclick="closeModal('change-role-modal')">&times;</button>
+            </div>
+            <form onsubmit="changeUserRole(event)">
+                <input type="hidden" id="change-role-user-id">
+                <div class="form-group">
+                    <label>Current User: <span id="change-role-user-name"></span></label>
+                </div>
+                <div class="form-group">
+                    <label>New Role *</label>
+                    <select id="new-role" required>
+                        <option value="candidate">Candidate</option>
+                        <option value="hr">HR</option>
+                        <option value="interviewer">Interviewer</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="error-message" id="role-error"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary">Change Role</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('change-role-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        requireAuth();
+
+        const user = getUser();
+        if (user.role !== 'admin') {
+            alert('Access denied. Admin only.');
+            window.location.href = 'dashboard.html';
+        }
+
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('user-role').textContent = user.role;
+
+        async function loadUsers() {
+            const container = document.getElementById('users-container');
+            const roleFilter = document.getElementById('role-filter').value;
+            const statusFilter = document.getElementById('status-filter').value;
+
+            container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+            try {
+                let url = '/users?page=1&page_size=100';
+                if (roleFilter) url += `&role=${roleFilter}`;
+                if (statusFilter) url += `&status=${statusFilter}`;
+
+                const data = await apiCall(url);
+                const users = data.items || [];
+
+                if (users.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; padding:40px; color:var(--secondary);">No users found</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Active</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${users.map(u => `
+                                <tr>
+                                    <td>${u.user_id}</td>
+                                    <td>${u.name}</td>
+                                    <td>${u.email}</td>
+                                    <td><span class="badge badge-draft" style="text-transform: capitalize;">${u.role}</span></td>
+                                    <td><span class="badge badge-${u.status === 'active' ? 'open' : 'closed'}">${u.status}</span></td>
+                                    <td>${u.is_active ? '✅' : '❌'}</td>
+                                    <td>
+                                        <div style="display: flex; gap: 5px;">
+                                            <button class="btn btn-sm btn-primary" onclick="openChangeRoleModal(${u.user_id}, '${u.name}', '${u.role}')">
+                                                Change Role
+                                            </button>
+                                            ${u.is_active ? `
+                                                <button class="btn btn-sm btn-danger" onclick="deactivateUser(${u.user_id})">
+                                                    Deactivate
+                                                </button>
+                                            ` : `
+                                                <button class="btn btn-sm btn-success" onclick="restoreUser(${u.user_id})">
+                                                    Restore
+                                                </button>
+                                            `}
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <p style="margin-top: 20px; color: var(--secondary);">Total users: ${data.total}</p>
+                `;
+            } catch (error) {
+                container.innerHTML = `<p style="color:red; text-align:center; padding:40px;">Error: ${error.message}</p>`;
+            }
+        }
+
+        function openChangeRoleModal(userId, userName, currentRole) {
+            document.getElementById('change-role-user-id').value = userId;
+            document.getElementById('change-role-user-name').textContent = userName;
+            document.getElementById('new-role').value = currentRole;
+            openModal('change-role-modal');
+        }
+
+        async function changeUserRole(event) {
+            event.preventDefault();
+
+            const userId = document.getElementById('change-role-user-id').value;
+            const newRole = document.getElementById('new-role').value;
+
+            hideError('role-error');
+
+            try {
+                await apiCall(`/users/${userId}/role`, {
+                    method: 'POST',
+                    body: JSON.stringify({ new_role: newRole })
+                });
+
+                alert('Role changed successfully!');
+                closeModal('change-role-modal');
+                loadUsers();
+            } catch (error) {
+                showError('role-error', error.message);
+            }
+        }
+
+        async function deactivateUser(userId) {
+            if (!confirm('Are you sure you want to deactivate this user?')) return;
+
+            try {
+                await apiCall(`/users/${userId}`, {
+                    method: 'DELETE'
+                });
+
+                alert('User deactivated successfully!');
+                loadUsers();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function restoreUser(userId) {
+            if (!confirm('Are you sure you want to restore this user?')) return;
+
+            try {
+                await apiCall(`/users/${userId}/restore`, {
+                    method: 'POST'
+                });
+
+                alert('User restored successfully!');
+                loadUsers();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        loadUsers();
+    </script>
+</body>
+</html>

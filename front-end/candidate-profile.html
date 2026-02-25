@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candidate Profile - JATS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <h1>🎯 JATS</h1>
+            <div class="navbar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="jobs.html">Jobs</a>
+                <a href="applications.html">Applications</a>
+                <a href="interviews.html">Interviews</a>
+                <div class="navbar-user">
+                    <span id="user-email" class="user-badge"></span>
+                    <span id="user-role" class="user-badge"></span>
+                    <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="dashboard">
+            <button class="btn btn-secondary btn-sm" onclick="window.history.back()" style="margin-bottom: 20px;">
+                ← Back
+            </button>
+
+            <div id="candidate-profile-container">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        requireAuth();
+
+        const user = getUser();
+        if (user.role !== 'hr' && user.role !== 'admin') {
+            alert('Access denied. HR/Admin only.');
+            window.location.href = 'dashboard.html';
+        }
+
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('user-role').textContent = user.role;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const candidateId = urlParams.get('id');
+
+        async function loadCandidateProfile() {
+            if (!candidateId) {
+                alert('No candidate ID provided');
+                window.history.back();
+                return;
+            }
+
+            const container = document.getElementById('candidate-profile-container');
+
+            try {
+                const data = await apiCall(`/candidates/${candidateId}/full-profile`);
+
+                container.innerHTML = `
+                    <div style="background: white; padding: 30px; border-radius: 12px; border: 2px solid var(--border);">
+                        <h2 style="margin-bottom: 30px;">Candidate Full Profile</h2>
+
+                        <!-- User Information -->
+                        <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                            <h3 style="margin-bottom: 15px;">User Information</h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                                <div>
+                                    <strong>Name:</strong> ${data.user.name}
+                                </div>
+                                <div>
+                                    <strong>Email:</strong> ${data.user.email}
+                                </div>
+                                <div>
+                                    <strong>Status:</strong> <span class="badge badge-${data.user.status === 'active' ? 'open' : 'closed'}">${data.user.status}</span>
+                                </div>
+                                <div>
+                                    <strong>Active:</strong> ${data.user.is_active ? '✅ Yes' : '❌ No'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Profile Information -->
+                        <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                            <h3 style="margin-bottom: 15px;">Profile Details</h3>
+                            <div style="margin-bottom: 15px;">
+                                <strong>Phone:</strong> ${data.profile.phone}
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <strong>Skills:</strong><br>
+                                <div style="margin-top: 10px;">
+                                    ${data.profile.skills.split(',').map(skill => 
+                                        `<span class="badge badge-draft" style="margin: 5px;">${skill.trim()}</span>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <strong>Experience:</strong> ${data.profile.experience_years} years
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <strong>Resume:</strong> ${data.profile.resume_path || 'Not provided'}
+                            </div>
+                        </div>
+
+                        <!-- Applications -->
+                        <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                            <h3 style="margin-bottom: 15px;">Applications (${data.applications.length})</h3>
+                            ${data.applications.length === 0 ? 
+                                '<p style="color: var(--secondary);">No applications yet</p>' :
+                                `<table>
+                                    <thead>
+                                        <tr>
+                                            <th>App ID</th>
+                                            <th>Job ID</th>
+                                            <th>Status</th>
+                                            <th>Applied Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${data.applications.map(app => `
+                                            <tr>
+                                                <td>${app.application_id}</td>
+                                                <td>${app.job_id}</td>
+                                                <td><span class="badge badge-${app.application_status}">${app.application_status}</span></td>
+                                                <td>${new Date(app.applied_date).toLocaleDateString()}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>`
+                            }
+                        </div>
+
+                        <!-- Interviews -->
+                        <div>
+                            <h3 style="margin-bottom: 15px;">Interviews (${data.interviews.length})</h3>
+                            ${data.interviews.length === 0 ?
+                                '<p style="color: var(--secondary);">No interviews scheduled</p>' :
+                                `<table>
+                                    <thead>
+                                        <tr>
+                                            <th>Interview ID</th>
+                                            <th>Application ID</th>
+                                            <th>Date</th>
+                                            <th>Type</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${data.interviews.map(interview => `
+                                            <tr>
+                                                <td>${interview.interview_id}</td>
+                                                <td>${interview.application_id}</td>
+                                                <td>${new Date(interview.interview_date).toLocaleString()}</td>
+                                                <td><span class="badge badge-draft">${interview.interview_type}</span></td>
+                                                <td><span class="badge badge-${interview.interview_status}">${interview.interview_status}</span></td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>`
+                            }
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                container.innerHTML = `<p style="color:red; text-align:center; padding:40px;">Error: ${error.message}</p>`;
+            }
+        }
+
+        loadCandidateProfile();
+    </script>
+</body>
+</html>

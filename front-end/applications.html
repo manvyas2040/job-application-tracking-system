@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Applications - JATS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <h1>🎯 JATS</h1>
+            <div class="navbar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="jobs.html">Jobs</a>
+                <a href="applications.html">Applications</a>
+                <a href="profile.html" id="nav-profile" style="display:none;">Profile</a>
+                <a href="notifications.html" id="nav-notifications" style="display:none;">🔔 Notifications</a>
+                <a href="interviews.html" id="nav-interviews" style="display:none;">Interviews</a>
+                <a href="change-password.html">🔐 Change Password</a>
+                <a href="users.html" id="nav-users" style="display:none;">Users</a>
+                <div class="navbar-user">
+                    <span id="user-email" class="user-badge"></span>
+                    <span id="user-role" class="user-badge"></span>
+                    <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="dashboard">
+            <h2>My Applications</h2>
+            <p style="color: var(--secondary); margin-bottom: 20px;">Track your job applications</p>
+
+            <div id="applications-container">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        requireAuth();
+        checkCandidateProfile();
+
+        const user = getUser();
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('user-role').textContent = user.role;
+
+        // Show role-based navigation
+        if (user.role === 'candidate') {
+            document.getElementById('nav-profile').style.display = 'inline-block';
+            document.getElementById('nav-notifications').style.display = 'inline-block';
+        }
+        if (user.role === 'hr' || user.role === 'admin' || user.role === 'interviewer') {
+            document.getElementById('nav-interviews').style.display = 'inline-block';
+        }
+        if (user.role === 'admin') {
+            document.getElementById('nav-users').style.display = 'inline-block';
+        }
+
+        // Load applications
+        loadApplications();
+
+        // Override loadApplications to link to application-detail
+        async function loadApplications() {
+            const container = document.getElementById('applications-container');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+            try {
+                const applications = await apiCall('/applications');
+                
+                if (applications.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; padding:40px; color:var(--secondary);">No applications found</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Application ID</th>
+                                <th>Job ID</th>
+                                <th>Status</th>
+                                <th>Applied Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${applications.map(app => `
+                                <tr>
+                                    <td>${app.application_id}</td>
+                                    <td>${app.job_id}</td>
+                                    <td><span class="badge badge-${app.application_status}">${app.application_status}</span></td>
+                                    <td>${new Date(app.applied_date).toLocaleDateString()}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" onclick="window.location.href='application-detail.html?id=${app.application_id}'">
+                                            View Details
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                container.innerHTML = `<p style="color:red;text-align:center;padding:40px;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

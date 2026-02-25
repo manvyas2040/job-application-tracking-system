@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Logs - JATS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <h1>🎯 JATS Admin</h1>
+            <div class="navbar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="jobs.html">Jobs</a>
+                <a href="users.html">Users</a>
+                <a href="audit-logs.html">Audit Logs</a>
+                <div class="navbar-user">
+                    <span id="user-email" class="user-badge"></span>
+                    <span id="user-role" class="user-badge"></span>
+                    <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="dashboard">
+            <h2>Audit Logs</h2>
+            <p style="color: var(--secondary); margin-bottom: 20px;">System activity and security logs</p>
+
+            <div id="audit-logs-container">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        requireAuth();
+
+        const user = getUser();
+        if (user.role !== 'admin') {
+            alert('Access denied. Admin only.');
+            window.location.href = 'dashboard.html';
+        }
+
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('user-role').textContent = user.role;
+
+        async function loadAuditLogs() {
+            const container = document.getElementById('audit-logs-container');
+
+            try {
+                const logs = await apiCall('/audit-logs');
+
+                if (logs.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; padding:40px; color:var(--secondary);">No audit logs</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Log ID</th>
+                                <th>User ID</th>
+                                <th>Action</th>
+                                <th>Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${logs.map(log => `
+                                <tr>
+                                    <td>${log.log_id}</td>
+                                    <td>${log.user_id}</td>
+                                    <td>
+                                        <span class="badge ${
+                                            log.action.includes('password') ? 'badge-closed' :
+                                            log.action.includes('role') ? 'badge-shortlisted' :
+                                            log.action.includes('deactivated') ? 'badge-rejected' :
+                                            'badge-draft'
+                                        }">
+                                            ${log.action}
+                                        </span>
+                                    </td>
+                                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <p style="margin-top: 20px; color: var(--secondary);">Total logs: ${logs.length}</p>
+                `;
+            } catch (error) {
+                container.innerHTML = `<p style="color:red; text-align:center; padding:40px;">Error: ${error.message}</p>`;
+            }
+        }
+
+        loadAuditLogs();
+    </script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications - JATS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <h1>🎯 JATS</h1>
+            <div class="navbar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="jobs.html">Jobs</a>
+                <a href="applications.html">Applications</a>
+                <a href="profile.html">Profile</a>
+                <a href="notifications.html">
+                    🔔 Notifications
+                </a>
+                <div class="navbar-user">
+                    <span id="user-email" class="user-badge"></span>
+                    <span id="user-role" class="user-badge"></span>
+                    <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="dashboard">
+            <h2>Notifications</h2>
+            <p style="color: var(--secondary); margin-bottom: 20px;">Stay updated on your applications and interviews</p>
+
+            <div id="notifications-container">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        requireAuth();
+
+        const user = getUser();
+        if (user.role !== 'candidate') {
+            alert('Notifications are only for candidates');
+            window.location.href = 'dashboard.html';
+        }
+
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('user-role').textContent = user.role;
+
+        async function loadNotifications() {
+            const container = document.getElementById('notifications-container');
+
+            try {
+                const notifications = await apiCall('/notifications');
+
+                if (notifications.length === 0) {
+                    container.innerHTML = `
+                        <p style="text-align:center; padding:40px; color:var(--secondary);">
+                            No notifications yet
+                        </p>
+                    `;
+                    return;
+                }
+
+                // Sort by date (newest first)
+                notifications.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+                container.innerHTML = notifications.map(notif => `
+                    <div class="notification-card ${notif.is_read ? 'read' : 'unread'}" 
+                         onclick="markAsRead(${notif.notification_id}, ${notif.related_application_id})"
+                         style="background: ${notif.is_read ? '#f8fafc' : 'white'}; 
+                                border: 2px solid ${notif.is_read ? '#e2e8f0' : '#3b82f6'}; 
+                                border-radius: 12px; 
+                                padding: 20px; 
+                                margin-bottom: 15px; 
+                                cursor: pointer;
+                                transition: all 0.3s;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                    <span class="badge badge-${notif.notification_type === 'info' ? 'open' : notif.notification_type === 'action_required' ? 'shortlisted' : 'closed'}">
+                                        ${notif.notification_type.replace('_', ' ').toUpperCase()}
+                                    </span>
+                                    ${!notif.is_read ? '<span class="badge" style="background:#ef4444; color:white;">NEW</span>' : ''}
+                                </div>
+                                <p style="margin: 0; font-weight: ${notif.is_read ? 'normal' : '600'};">
+                                    ${notif.message}
+                                </p>
+                                <p style="margin-top: 10px; font-size: 0.85rem; color: var(--secondary);">
+                                    ${new Date(notif.created_at).toLocaleString()}
+                                </p>
+                            </div>
+                            ${notif.related_application_id ? `
+                                <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); viewApplication(${notif.related_application_id})">
+                                    View Application
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                container.innerHTML = `<p style="color:red; text-align:center; padding:40px;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function markAsRead(notificationId, applicationId) {
+            try {
+                await apiCall(`/notifications/${notificationId}/read`, {
+                    method: 'PATCH'
+                });
+                
+                if (applicationId) {
+                    window.location.href = `application-detail.html?id=${applicationId}`;
+                } else {
+                    loadNotifications();
+                }
+            } catch (error) {
+                console.error('Error marking notification as read:', error);
+                if (applicationId) {
+                    window.location.href = `application-detail.html?id=${applicationId}`;
+                }
+            }
+        }
+
+        function viewApplication(applicationId) {
+            window.location.href = `application-detail.html?id=${applicationId}`;
+        }
+
+        loadNotifications();
+    </script>
+</body>
+</html>

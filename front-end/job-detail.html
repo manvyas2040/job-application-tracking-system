@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Details - JATS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <h1>🎯 JATS</h1>
+            <div class="navbar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="jobs.html">Jobs</a>
+                <a href="applications.html">Applications</a>
+                <div class="navbar-user">
+                    <span id="user-email" class="user-badge"></span>
+                    <span id="user-role" class="user-badge"></span>
+                    <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="dashboard">
+            <button class="btn btn-secondary btn-sm" onclick="window.history.back()" style="margin-bottom: 20px;">
+                ← Back
+            </button>
+
+            <div id="job-detail-container">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        requireAuth();
+
+        const user = getUser();
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('user-role').textContent = user.role;
+
+        // Get job ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const jobId = urlParams.get('id');
+
+        async function loadJobDetail() {
+            if (!jobId) {
+                alert('No job ID provided');
+                window.location.href = 'jobs.html';
+                return;
+            }
+
+            const container = document.getElementById('job-detail-container');
+
+            try {
+                const job = await apiCall(`/jobs/${jobId}`);
+
+                container.innerHTML = `
+                    <div style="background: white; padding: 30px; border-radius: 12px; border: 2px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+                            <div>
+                                <h1 style="margin-bottom: 10px;">${job.job_titel}</h1>
+                                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                                    <span class="badge badge-${job.job_status}">${job.job_status}</span>
+                                    <span class="badge badge-draft">${job.department}</span>
+                                    <span class="badge badge-draft">Experience: ${job.experienc_required} years</span>
+                                </div>
+                            </div>
+                            ${user.role === 'candidate' && job.job_status === 'open' ? `
+                                <button class="btn btn-success" onclick="applyToJob(${job.job_id})">
+                                    Apply Now
+                                </button>
+                            ` : ''}
+                        </div>
+
+                        <div style="margin-top: 30px;">
+                            <h3 style="margin-bottom: 15px;">Job Description</h3>
+                            <p style="line-height: 1.8; color: var(--secondary); white-space: pre-wrap;">${job.job_description}</p>
+                        </div>
+
+                        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border);">
+                            <p style="color: var(--secondary); font-size: 0.9rem;">
+                                Posted on: ${new Date(job.posted_date).toLocaleDateString('en-US', { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                })}
+                            </p>
+                        </div>
+
+                        ${user.role === 'hr' || user.role === 'admin' ? `
+                            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border);">
+                                <h3 style="margin-bottom: 15px;">Job Actions</h3>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    ${job.job_status === 'draft' ? `
+                                        <button class="btn btn-success btn-sm" onclick="updateJobStatus(${job.job_id}, 'open')">
+                                            Publish Job
+                                        </button>
+                                    ` : ''}
+                                    ${job.job_status === 'open' ? `
+                                        <button class="btn btn-danger btn-sm" onclick="updateJobStatus(${job.job_id}, 'closed')">
+                                            Close Job
+                                        </button>
+                                    ` : ''}
+                                    ${job.job_status === 'closed' ? `
+                                        <button class="btn btn-secondary btn-sm" onclick="updateJobStatus(${job.job_id}, 'archived')">
+                                            Archive Job
+                                        </button>
+                                    ` : ''}
+                                    ${(job.job_status === 'archived' || job.job_status === 'closed') && user.role === 'admin' ? `
+                                        <button class="btn btn-success btn-sm" onclick="reopenJob(${job.job_id})">
+                                            Reopen Job (Admin Override)
+                                        </button>
+                                    ` : ''}
+                                    <button class="btn btn-primary btn-sm" onclick="viewJobAnalytics(${job.job_id})">
+                                        View Analytics
+                                    </button>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            } catch (error) {
+                container.innerHTML = `
+                    <p style="color: var(--danger); text-align: center; padding: 40px;">
+                        Error loading job: ${error.message}
+                    </p>
+                `;
+            }
+        }
+
+        async function updateJobStatus(jobId, newStatus) {
+            if (!confirm(`Are you sure you want to change the job status to "${newStatus}"?`)) {
+                return;
+            }
+
+            try {
+                await apiCall(`/jobs/${jobId}/state`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ job_status: newStatus }),
+                });
+
+                alert('Job status updated successfully!');
+                loadJobDetail();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function viewJobAnalytics(jobId) {
+            try {
+                const analytics = await apiCall(`/jobs/${jobId}/analytics`);
+                alert(`Job Analytics:\n\nApplications: ${analytics.applications}\nInterviews: ${analytics.interviews}`);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function reopenJob(jobId) {
+            if (!confirm('Are you sure you want to reopen this job? (Admin override)')) {
+                return;
+            }
+
+            try {
+                await apiCall(`/jobs/${jobId}/reopen`, {
+                    method: 'PATCH'
+                });
+
+                alert('Job reopened successfully!');
+                loadJobDetail();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        loadJobDetail();
+    </script>
+</body>
+</html>

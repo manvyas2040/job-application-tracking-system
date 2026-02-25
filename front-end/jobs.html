@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jobs - JATS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <h1>🎯 JATS</h1>
+            <div class="navbar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="jobs.html">Jobs</a>
+                <a href="applications.html">Applications</a>
+                <a href="change-password.html">🔐 Change Password</a>
+                <div class="navbar-user">
+                    <span id="user-email" class="user-badge"></span>
+                    <span id="user-role" class="user-badge"></span>
+                    <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="dashboard">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Available Jobs</h2>
+                <button id="create-job-btn" class="btn btn-success" onclick="openModal('create-job-modal')">
+                    + Create Job
+                </button>
+            </div>
+
+            <div id="jobs-container" class="jobs-grid">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Job Modal -->
+    <div id="create-job-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Job</h2>
+                <button class="close-btn" onclick="closeModal('create-job-modal')">&times;</button>
+            </div>
+            <div id="job-error" style="display:none; padding:10px; background:#fee; color:#c00; border-radius:8px; margin-bottom:15px;"></div>
+            <div id="job-success" style="display:none; padding:10px; background:#efe; color:#080; border-radius:8px; margin-bottom:15px;"></div>
+            <form onsubmit="createJob(event)">
+                <div class="form-group">
+                    <label>Job Title</label>
+                    <input type="text" id="job-title" required placeholder="e.g. Senior Software Engineer">
+                </div>
+                <div class="form-group">
+                    <label>Job Description</label>
+                    <textarea id="job-description" rows="5" required placeholder="Describe the job role and responsibilities"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Department</label>
+                    <input type="text" id="job-department" required placeholder="e.g. Engineering">
+                </div>
+                <div class="form-group">
+                    <label>Experience Required (years)</label>
+                    <input type="number" id="job-experience" required min="0" placeholder="0">
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary">Create Job</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('create-job-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        requireAuth();
+
+        const user = getUser();
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('user-role').textContent = user.role;
+
+        // Show create job button for HR and Admin only
+        if (user.role === 'hr' || user.role === 'admin') {
+            document.getElementById('create-job-btn').style.display = 'block';
+        } else {
+            document.getElementById('create-job-btn').style.display = 'none';
+        }
+
+        // Load jobs
+        loadJobs();
+    </script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 from datetime import datetime
 from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from .authentication import (
@@ -42,6 +43,16 @@ from .schemas import (
 from fastapi.security import OAuth2PasswordRequestForm
 
 app = FastAPI(title="Job Application Tracking System")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://127.0.0.1:8080", "http://localhost:5500", "http://127.0.0.1:5500"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 Base.metadata.create_all(bind=engine)   
 JOB_TRANSITIONS = {
     "draft": {"open", "archived"},
@@ -253,6 +264,16 @@ def restore_user(user_id: int, current=Depends(get_current_user), db: Session = 
 
 #   this is full candidate functionality
 
+@app.get("/candidate/profile")
+def get_candidate_profile(current=Depends(get_current_user), db: Session = Depends(get_db)):
+    user = _current_db_user(current, db)
+    require_roles("candidate")(current)
+    
+    profile = db.query(Candidate).filter(Candidate.user_id == user.user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Candidate profile not found")
+    return profile
+
 @app.post("/candidate/profile")
 def create_candidate_profile(payload: CandidateUpdate, current=Depends(get_current_user), db: Session = Depends(get_db)):
     user = _current_db_user(current, db)
@@ -297,7 +318,59 @@ def update_candidate_profile(payload: CandidateUpdate, current=Depends(get_curre
     db.refresh(profile)
     return profile
 
-# this is full jobs functionality 
+@app.get("/candidates/{candidate_id}/full-profile")
+def get_full_candidate_profile(candidate_id: int, current=Depends(get_current_user), db: Session = Depends(get_db)):
+    _current_db_user(current, db)
+    require_roles("hr", "admin")(current)
+    
+    candidate = db.query(Candidate).filter(Candidate.candidate_id == candidate_id).first()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    
+    user = db.query(User).filter(User.user_id == candidate.user_id).first()
+    applications = db.query(Application).filter(Application.candidate_id == candidate_id).all()
+    
+    # Get interviews through applications
+    interviews = (
+        db.query(Interview)
+        .join(Application, Interview.application_id == Application.application_id)
+        .filter(Application.candidate_id == candidate_id)
+        .all()
+    )
+    
+    return {
+        "candidate_id": candidate.candidate_id,
+        "user": {
+            "user_id": user.user_id,
+            "name": user.name,
+            "email": user.email,
+            "status": user.status,
+            "is_active": user.is_active,
+        },
+        "profile": {
+            "phone": candidate.phone,
+            "skills": candidate.skills,
+            "experience_years": candidate.experience_year,
+            "resume_path": candidate.resume_path,
+        },
+        "applications": applications,
+        "interviews": interviews,
+    }
+ 
+
+@app.get("/jobs")
+def list_jobs(
+    status: str | None = Query(default=None),
+    page: int = 1,
+    page_size: int = 20,
+    db: Session = Depends(get_db)
+):
+    q = db.query(Job)
+    if status:
+        q = q.filter(Job.job_status == status)
+    total = q.count()
+    items = q.order_by(Job.posted_date.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    return {"total": total, "items": items}
 
 @app.post("/jobs")
 def create_job(payload: JobCreate, current=Depends(get_current_user), db: Session = Depends(get_db)):
@@ -336,6 +409,20 @@ def update_job_state(job_id: int, payload: JobStateUpdate, current=Depends(get_c
     if payload.job_status not in JOB_TRANSITIONS.get(row.job_status, set()):
         raise HTTPException(status_code=400, detail="Invalid job state transition")
     row.job_status = payload.job_status
+    db.commit()
+    return row
+
+@app.patch("/jobs/{job_id}/reopen")
+def reopen_job(job_id: int, current=Depends(get_current_user), db: Session = Depends(get_db)):
+    _current_db_user(current, db)
+    require_roles("admin")(current)  # Only admin can reopen archived jobs
+    
+    row = db.query(Job).filter(Job.job_id == job_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Admin override - can reopen any job
+    row.job_status = "open"
     db.commit()
     return row
 
@@ -446,6 +533,73 @@ def bulk_reject(payload: BulkStatusUpdate, current=Depends(get_current_user), db
 
 # this is full interviews functionality 
 
+@app.get("/interviews/my")
+def get_my_interviews(current=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get interviews assigned to current interviewer with candidate and application details"""
+    user = _current_db_user(current, db)
+    require_roles("interviewer")(current)
+    
+    interviews = (
+        db.query(Interview)
+        .filter(Interview.interviewer_id == user.user_id)
+        .all()
+    )
+    
+    result = []
+    for interview in interviews:
+        # Get application details
+        app = db.query(Application).filter(Application.application_id == interview.application_id).first()
+        if not app:
+            continue
+        
+        # Get candidate details
+        candidate = db.query(Candidate).filter(Candidate.candidate_id == app.candidate_id).first()
+        candidate_user = db.query(User).filter(User.user_id == candidate.user_id).first() if candidate else None
+        
+        # Get job details
+        job = db.query(Job).filter(Job.job_id == app.job_id).first()
+        
+        # Get feedback if exists
+        feedback = db.query(InterviewFeedback).filter(InterviewFeedback.interview_id == interview.interview_id).first()
+        
+        result.append({
+            "interview": {
+                "interview_id": interview.interview_id,
+                "interview_date": interview.interview_date,
+                "interview_type": interview.interview_type,
+                "interview_status": interview.interview_status,
+                "interviewer_id": interview.interviewer_id,
+                "application_id": interview.application_id,
+            },
+            "application": {
+                "application_id": app.application_id,
+                "application_status": app.application_status,
+                "applied_date": app.applied_date,
+            },
+            "candidate": {
+                "candidate_id": app.candidate_id,
+                "name": candidate_user.name if candidate_user else "Unknown",
+                "email": candidate_user.email if candidate_user else "Unknown",
+                "phone": candidate.phone,
+                "skills": candidate.skills,
+                "experience_years": candidate.experience_year,
+            },
+            "job": {
+                "job_id": job.job_id,
+                "job_title": job.job_titel,
+                "department": job.department,
+            },
+            "feedback": {
+                "feedback_id": feedback.feedback_id if feedback else None,
+                "rating": feedback.rating if feedback else None,
+                "comments": feedback.comments if feedback else None,
+                "recommendation": feedback.recommendation if feedback else None,
+            } if feedback else None,
+        })
+    
+    return result
+
+
 @app.post("/interviews")
 def create_interview(payload: InterviewCreate, current=Depends(get_current_user), db: Session = Depends(get_db)):
     _current_db_user(current, db)
@@ -500,6 +654,94 @@ def update_interview(interview_id: int, payload: InterviewUpdate, current=Depend
         row.interview_type = payload.interview_type
     if payload.interview_status is not None:
         row.interview_status = payload.interview_status
+    db.commit()
+    return row
+
+
+@app.delete("/interviews/{interview_id}")
+def delete_interview(interview_id: int, current=Depends(get_current_user), db: Session = Depends(get_db)):
+    user = _current_db_user(current, db)
+    require_roles("hr", "admin")(current)
+    
+    row = db.query(Interview).filter(Interview.interview_id == interview_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Interview not found")
+    
+    # Get application to verify ownership and create notification
+    app_row = db.query(Application).filter(Application.application_id == row.application_id).first()
+    if not app_row:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # Verify HR/Admin owns this job
+    job = db.query(Job).filter(Job.job_id == app_row.job_id).first()
+    enforce_owner_or_admin(current, job.owner_hr_id)
+    
+    # Delete any feedback associated with this interview
+    db.query(InterviewFeedback).filter(InterviewFeedback.interview_id == interview_id).delete()
+    
+    # Delete the interview
+    db.delete(row)
+    
+    # Revert application status back to shortlisted
+    if app_row.application_status == "interview_scheduled":
+        app_row.application_status = "shortlisted"
+    
+    # Notify candidate about interview deletion
+    _notify(db, app_row.candidate_id, "Your scheduled interview has been cancelled", "warning", app_row.application_id)
+    
+    db.commit()
+    return {"message": "Interview deleted successfully"}
+
+
+@app.post("/interviews/{interview_id}/reschedule")
+def reschedule_interview(interview_id: int, payload: InterviewUpdate, current=Depends(get_current_user), db: Session = Depends(get_db)):
+    user = _current_db_user(current, db)
+    require_roles("hr", "admin", "interviewer")(current)
+    
+    row = db.query(Interview).filter(Interview.interview_id == interview_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Interview not found")
+    
+    # Get application
+    app_row = db.query(Application).filter(Application.application_id == row.application_id).first()
+    if not app_row:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # Verify permissions (HR/Admin can reschedule, Interviewer can only request reschedule)
+    if current["role"] == "interviewer" and row.interviewer_id != user.user_id:
+        raise HTTPException(status_code=403, detail="Interviewer can only reschedule their own interviews")
+    
+    # Verify HR/Admin own this job
+    job = db.query(Job).filter(Job.job_id == app_row.job_id).first()
+    if current["role"] in ["hr", "admin"]:
+        enforce_owner_or_admin(current, job.owner_hr_id)
+    
+    # Check for conflicts with new date if provided
+    if payload.interview_date:
+        conflict = (
+            db.query(Interview)
+            .filter(
+                Interview.interview_id != interview_id,
+                Interview.interviewer_id == row.interviewer_id,
+                Interview.interview_date == payload.interview_date,
+                Interview.interview_status.in_(["scheduled", "rescheduled"]),
+            )
+            .first()
+        )
+        if conflict:
+            raise HTTPException(status_code=400, detail="Interviewer has a calendar conflict at new time")
+        
+        row.interview_date = payload.interview_date
+        row.interview_status = "rescheduled"
+    
+    if payload.interview_type:
+        row.interview_type = payload.interview_type
+    
+    db.commit()
+    
+    # Notify candidate about reschedule
+    _notify(db, app_row.candidate_id, f"Your interview has been rescheduled to {row.interview_date.strftime('%Y-%m-%d %H:%M')}", "info", app_row.application_id)
+    
     db.commit()
     return row
 

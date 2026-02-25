@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interviews - JATS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <h1>🎯 JATS</h1>
+            <div class="navbar-menu">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="jobs.html">Jobs</a>
+                <a href="applications.html">Applications</a>
+                <a href="interviews.html">Interviews</a>
+                <a href="change-password.html">🔐 Change Password</a>
+                <div class="navbar-user">
+                    <span id="user-email" class="user-badge"></span>
+                    <span id="user-role" class="user-badge"></span>
+                    <button class="btn btn-sm btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="dashboard">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Interview Management</h2>
+                <button id="schedule-btn" class="btn btn-success" onclick="openModal('schedule-interview-modal')" style="display:none;">
+                    + Schedule Interview
+                </button>
+            </div>
+
+            <!-- HR View: Shortlisted Applications -->
+            <div id="hr-view" style="display:none;">
+                <h3>Shortlisted Applications</h3>
+                <p style="color: var(--secondary); margin-bottom: 20px;">Schedule interviews for shortlisted candidates</p>
+                <div id="shortlisted-container">
+                    <div class="loading"><div class="spinner"></div></div>
+                </div>
+            </div>
+
+            <!-- Interviewer View: Assigned Interviews -->
+            <div id="interviewer-view" style="display:none;">
+                <h3>My Interviews</h3>
+                <p style="color: var(--secondary); margin-bottom: 20px;">Your scheduled interviews and feedback</p>
+                <div id="interviews-container">
+                    <div class="loading"><div class="spinner"></div></div>
+                </div>
+            </div>
+
+            <!-- All Interviews View -->
+            <div id="all-interviews-view">
+                <h3>All Interviews</h3>
+                <div id="all-interviews-container">
+                    <div class="loading"><div class="spinner"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Interview Modal -->
+    <div id="schedule-interview-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Schedule Interview</h2>
+                <button class="close-btn" onclick="closeModal('schedule-interview-modal')">&times;</button>
+            </div>
+            <form onsubmit="scheduleInterview(event)">
+                <div class="form-group">
+                    <label>Application ID *</label>
+                    <input type="number" id="application-id" required placeholder="Enter application ID">
+                </div>
+                <div class="form-group">
+                    <label>Interview Date & Time *</label>
+                    <input type="datetime-local" id="interview-date" required>
+                </div>
+                <div class="form-group">
+                    <label>Interview Type *</label>
+                    <select id="interview-type" required>
+                        <option value="technical">Technical</option>
+                        <option value="hr">HR Round</option>
+                        <option value="managerial">Managerial</option>
+                        <option value="cultural">Cultural Fit</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Interviewer ID *</label>
+                    <input type="number" id="interviewer-id" required placeholder="Enter interviewer user ID">
+                    <small style="color: var(--secondary);">Get this from Users page</small>
+                </div>
+                <div class="error-message" id="schedule-error"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary">Schedule</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('schedule-interview-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Submit Feedback Modal -->
+    <div id="feedback-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Submit Interview Feedback</h2>
+                <button class="close-btn" onclick="closeModal('feedback-modal')">&times;</button>
+            </div>
+            <form id="feedback-form" onsubmit="submitFeedback(event)">
+                <input type="hidden" id="feedback-interview-id">
+                <div class="form-group">
+                    <label>Rating (1-10) *</label>
+                    <input type="number" id="feedback-rating" required min="1" max="10" placeholder="1-10">
+                </div>
+                <div class="form-group">
+                    <label>Comments *</label>
+                    <textarea id="feedback-comments" rows="5" required placeholder="Share your detailed feedback..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Recommendation *</label>
+                    <select id="feedback-recommendation" required>
+                        <option value="strong_hire">Strong Hire</option>
+                        <option value="hire">Hire</option>
+                        <option value="maybe">Maybe</option>
+                        <option value="no_hire">No Hire</option>
+                    </select>
+                </div>
+                <div class="error-message" id="feedback-error"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-success">Submit Feedback</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('feedback-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reschedule Interview Modal -->
+    <div id="reschedule-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Reschedule Interview</h2>
+                <button class="close-btn" onclick="closeModal('reschedule-modal')">&times;</button>
+            </div>
+            <form onsubmit="rescheduleInterview(event)">
+                <input type="hidden" id="reschedule-interview-id">
+                <div class="form-group">
+                    <label>New Date & Time *</label>
+                    <input type="datetime-local" id="reschedule-date" required>
+                </div>
+                <div class="form-group">
+                    <label>Interview Type (Optional)</label>
+                    <select id="reschedule-type">
+                        <option value="">Keep Current</option>
+                        <option value="technical">Technical</option>
+                        <option value="hr">HR Round</option>
+                        <option value="managerial">Managerial</option>
+                        <option value="cultural">Cultural Fit</option>
+                    </select>
+                </div>
+                <div class="error-message" id="reschedule-error"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary">Reschedule</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('reschedule-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Interview Modal -->
+    <div id="delete-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Cancel Interview</h2>
+                <button class="close-btn" onclick="closeModal('delete-modal')">&times;</button>
+            </div>
+            <p style="color: var(--secondary); margin-bottom: 20px;">Are you sure you want to cancel this interview? The candidate will be notified.</p>
+            <div style="background: #fee; border: 1px solid #fcc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p><strong>Interview ID:</strong> <span id="delete-interview-id-display"></span></p>
+                <p id="delete-interview-info"></p>
+            </div>
+            <div class="error-message" id="delete-error"></div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="confirmDeleteInterview()" class="btn btn-danger">Yes, Cancel Interview</button>
+                <button onclick="closeModal('delete-modal')" class="btn btn-secondary">No, Keep It</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        requireAuth();
+
+        const user = getUser();
+        document.getElementById('user-email').textContent = user.email;
+        document.getElementById('user-role').textContent = user.role;
+
+        const isHR = user.role === 'hr' || user.role === 'admin';
+        const isInterviewer = user.role === 'interviewer';
+
+        if (isHR) {
+            document.getElementById('hr-view').style.display = 'block';
+            document.getElementById('schedule-btn').style.display = 'block';
+            loadShortlistedApplications();
+        }
+
+        if (isInterviewer) {
+            document.getElementById('interviewer-view').style.display = 'block';
+            loadMyInterviews();
+        }
+
+        // Load all interviews for overview
+        loadAllInterviews();
+
+        async function loadShortlistedApplications() {
+            const container = document.getElementById('shortlisted-container');
+            
+            try {
+                const applications = await apiCall('/applications');
+                const shortlisted = applications.filter(app => app.application_status === 'shortlisted');
+
+                if (shortlisted.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; padding:40px; color:var(--secondary);">No shortlisted applications</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>App ID</th>
+                                <th>Job ID</th>
+                                <th>Candidate ID</th>
+                                <th>Applied Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${shortlisted.map(app => `
+                                <tr>
+                                    <td>${app.application_id}</td>
+                                    <td>${app.job_id}</td>
+                                    <td><a href="#" onclick="viewCandidateProfile(${app.candidate_id}); return false;">${app.candidate_id}</a></td>
+                                    <td>${new Date(app.applied_date).toLocaleDateString()}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-success" onclick="openScheduleModal(${app.application_id})">
+                                            Schedule Interview
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                container.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function loadMyInterviews() {
+            const container = document.getElementById('interviews-container');
+
+            try {
+                const interviews = await apiCall('/interviews/my');
+                
+                if (interviews.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; padding:40px; color:var(--secondary);">No interviews assigned yet</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <div style="display: grid; gap: 20px;">
+                        ${interviews.map(item => `
+                            <div style="background: white; padding: 20px; border-radius: 12px; border: 2px solid var(--border);">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                                    <div>
+                                        <h3 style="margin: 0 0 5px 0;">Interview #${item.interview.interview_id}</h3>
+                                        <p style="margin: 0; color: var(--secondary);">
+                                            <strong>Candidate:</strong> <a href="#" onclick="viewCandidateProfile(${item.candidate.candidate_id}); return false;" style="color: var(--primary); text-decoration: underline;">${item.candidate.name}</a>
+                                        </p>
+                                    </div>
+                                    <span class="badge badge-${item.interview.interview_status}">${item.interview.interview_status}</span>
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                                    <div>
+                                        <strong>Date & Time:</strong><br>
+                                        ${new Date(item.interview.interview_date).toLocaleString()}
+                                    </div>
+                                    <div>
+                                        <strong>Type:</strong><br>
+                                        ${item.interview.interview_type}
+                                    </div>
+                                    <div>
+                                        <strong>Job:</strong><br>
+                                        ${item.job.job_title} (${item.job.department})
+                                    </div>
+                                    <div>
+                                        <strong>Application Status:</strong><br>
+                                        <span class="badge badge-${item.application.application_status}">
+                                            ${item.application.application_status}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                                    <h4 style="margin-top: 0;">Candidate Details</h4>
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                                        <div>
+                                            <strong>Email:</strong><br>
+                                            ${item.candidate.email}
+                                        </div>
+                                        <div>
+                                            <strong>Phone:</strong><br>
+                                            ${item.candidate.phone}
+                                        </div>
+                                        <div>
+                                            <strong>Experience:</strong><br>
+                                            ${item.candidate.experience_years} years
+                                        </div>
+                                    </div>
+                                    <div style="margin-top: 10px;">
+                                        <strong>Skills:</strong><br>
+                                        <div style="margin-top: 8px;">
+                                            ${item.candidate.skills.split(',').map(skill => 
+                                                `<span class="badge badge-draft" style="margin: 3px;">${skill.trim()}</span>`
+                                            ).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    ${!item.feedback && item.interview.interview_status === 'scheduled' ? `
+                                        <button class="btn btn-sm btn-success" onclick="openFeedbackModal(${item.interview.interview_id})">
+                                            Submit Feedback
+                                        </button>
+                                    ` : ''}
+                                    ${item.interview.interview_status === 'scheduled' ? `
+                                        <button class="btn btn-sm btn-primary" onclick="openRescheduleInterviewModal(${item.interview.interview_id}, '${item.interview.interview_date}')">
+                                            Request Reschedule
+                                        </button>
+                                    ` : ''}
+                                    <button class="btn btn-sm btn-secondary" onclick="viewCandidateProfile(${item.candidate.candidate_id})">
+                                        View Full Profile
+                                    </button>
+                                    ${item.feedback ? `
+                                        <div style="background: #efe; padding: 10px; border-radius: 8px; flex: 1; min-width: 200px;">
+                                            <strong>✓ Feedback Submitted</strong><br>
+                                            <small>Rating: ${item.feedback.rating}/10 | ${item.feedback.recommendation}</small>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } catch (error) {
+                container.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function loadAllInterviews() {
+            const container = document.getElementById('all-interviews-container');
+
+            try {
+                // Note: Backend doesn't have GET /interviews, so we'll show a message
+                container.innerHTML = `
+                    <p style="text-align:center; padding:40px; color:var(--secondary);">
+                        Interview details are visible when viewing specific applications
+                    </p>
+                `;
+            } catch (error) {
+                container.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        function openScheduleModal(appId) {
+            document.getElementById('application-id').value = appId;
+            openModal('schedule-interview-modal');
+        }
+
+        async function scheduleInterview(event) {
+            event.preventDefault();
+
+            const applicationId = parseInt(document.getElementById('application-id').value);
+            const interviewDate = document.getElementById('interview-date').value;
+            const interviewType = document.getElementById('interview-type').value;
+            const interviewerId = parseInt(document.getElementById('interviewer-id').value);
+
+            hideError('schedule-error');
+
+            try {
+                await apiCall('/interviews', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        application_id: applicationId,
+                        interview_date: interviewDate,
+                        interview_type: interviewType,
+                        interviewer_id: interviewerId
+                    })
+                });
+
+                alert('Interview scheduled successfully!');
+                closeModal('schedule-interview-modal');
+                loadShortlistedApplications();
+                loadAllInterviews();
+            } catch (error) {
+                showError('schedule-error', error.message);
+            }
+        }
+
+        function openFeedbackModal(interviewId) {
+            document.getElementById('feedback-interview-id').value = interviewId;
+            openModal('feedback-modal');
+        }
+
+        async function submitFeedback(event) {
+            event.preventDefault();
+
+            const interviewId = parseInt(document.getElementById('feedback-interview-id').value);
+            const rating = parseInt(document.getElementById('feedback-rating').value);
+            const comments = document.getElementById('feedback-comments').value;
+            const recommendation = document.getElementById('feedback-recommendation').value;
+
+            hideError('feedback-error');
+
+            try {
+                await apiCall('/feedback', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        interview_id: interviewId,
+                        rating,
+                        comments,
+                        recommendation
+                    })
+                });
+
+                alert('Feedback submitted successfully!');
+                closeModal('feedback-modal');
+                document.getElementById('feedback-form').reset();
+                loadMyInterviews();
+            } catch (error) {
+                showError('feedback-error', error.message);
+            }
+        }
+
+        async function viewCandidateProfile(candidateId) {
+            window.location.href = `candidate-profile.html?id=${candidateId}`;
+        }
+
+        function openRescheduleModal(interviewId, currentDate) {
+            document.getElementById('reschedule-interview-id').value = interviewId;
+            // Pre-fill with current date
+            if (currentDate) {
+                const dateObj = new Date(currentDate);
+                const isoString = dateObj.toISOString().slice(0, 16);
+                document.getElementById('reschedule-date').value = isoString;
+            }
+            openModal('reschedule-modal');
+        }
+
+        async function rescheduleInterview(event) {
+            event.preventDefault();
+
+            const interviewId = parseInt(document.getElementById('reschedule-interview-id').value);
+            const newDate = document.getElementById('reschedule-date').value;
+            const newType = document.getElementById('reschedule-type').value;
+
+            hideError('reschedule-error');
+
+            try {
+                await apiCall(`/interviews/${interviewId}/reschedule`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        interview_date: newDate,
+                        interview_type: newType || null
+                    })
+                });
+
+                alert('Interview rescheduled successfully! Candidate has been notified.');
+                closeModal('reschedule-modal');
+                loadShortlistedApplications();
+                loadMyInterviews();
+                loadAllInterviews();
+            } catch (error) {
+                showError('reschedule-error', error.message);
+            }
+        }
+
+        function openDeleteModal(interviewId, interviewDate) {
+            document.getElementById('delete-interview-id-display').textContent = interviewId;
+            document.getElementById('delete-interview-info').innerHTML = `<strong>Scheduled:</strong> ${new Date(interviewDate).toLocaleString()}`;
+            window.currentDeleteInterviewId = interviewId;
+            openModal('delete-modal');
+        }
+
+        async function confirmDeleteInterview() {
+            const interviewId = window.currentDeleteInterviewId;
+            
+            try {
+                await apiCall(`/interviews/${interviewId}`, {
+                    method: 'DELETE'
+                });
+
+                alert('Interview cancelled successfully! Candidate has been notified.');
+                closeModal('delete-modal');
+                loadShortlistedApplications();
+                loadMyInterviews();
+                loadAllInterviews();
+            } catch (error) {
+                showError('delete-error', error.message);
+            }
+        }
+
+        function viewCandidateProfile(candidateId) {
+            window.location.href = `candidate-profile.html?id=${candidateId}`;
+        }
+    </script>
+</body>
+</html>
