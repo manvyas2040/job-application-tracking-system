@@ -50,6 +50,7 @@ def apply_job(
     
     _notify(db, candidate.candidate_id, "Application submitted", "info", app_row.application_id)
     db.commit()
+    db.refresh(app_row)
     return app_row
 
 

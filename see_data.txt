@@ -1,0 +1,31 @@
+# ─── Data ───────────────────────────────────────────────────
+USERS = [
+    {"name": "Rajesh Kumar",    "email": "admin@company.com",        "password": "Admin@123",  "role": "admin"},
+    {"name": "Priya Sharma",    "email": "hr1@company.com",          "password": "Hr@12345",   "role": "hr"},
+    {"name": "Amit Patel",      "email": "hr2@company.com",          "password": "Hr@12345",   "role": "hr"},
+    {"name": "Suresh Mehta",    "email": "interviewer1@company.com", "password": "Inter@123",  "role": "interviewer"},
+    {"name": "Neha Gupta",      "email": "interviewer2@company.com", "password": "Inter@123",  "role": "interviewer"},
+    {"name": "Rohan Verma",     "email": "rohan@gmail.com",          "password": "Cand@1234",  "role": "candidate"},
+    {"name": "Sneha Das",       "email": "sneha@gmail.com",          "password": "Cand@1234",  "role": "candidate"},
+    {"name": "Vikram Singh",    "email": "vikram@gmail.com",         "password": "Cand@1234",  "role": "candidate"},
+    {"name": "Pooja Rao",       "email": "pooja@gmail.com",          "password": "Cand@1234",  "role": "candidate"},
+    {"name": "Arjun Nair",      "email": "arjun@gmail.com",          "password": "Cand@1234",  "role": "candidate"},
+]
+
+PROFILES = {
+    "rohan@gmail.com":  {"phone": "9876543210", "skills": "Python, Django, REST APIs, PostgreSQL",   "experience_years": 3, "resume_path": "/resumes/rohan.pdf"},
+    "sneha@gmail.com":  {"phone": "9876543211", "skills": "React, JavaScript, TypeScript, Redux",     "experience_years": 2, "resume_path": "/resumes/sneha.pdf"},
+    "vikram@gmail.com": {"phone": "9876543212", "skills": "Java, Spring Boot, Microservices, AWS",    "experience_years": 5, "resume_path": "/resumes/vikram.pdf"},
+    "pooja@gmail.com":  {"phone": "9876543213", "skills": "Data Science, Python, ML, TensorFlow",     "experience_years": 4, "resume_path": "/resumes/pooja.pdf"},
+    "arjun@gmail.com":  {"phone": "9876543214", "skills": "DevOps, Docker, Kubernetes, CI/CD, Linux", "experience_years": 3, "resume_path": "/resumes/arjun.pdf"},
+}
+
+JOBS = [
+    {"job_title": "Senior Python Developer",  "job_description": "Build backend services with Python, FastAPI, PostgreSQL.", "department": "Engineering",    "experience_required": 3},
+    {"job_title": "Frontend React Developer",  "job_description": "Develop responsive web apps with React & TypeScript.",    "department": "Engineering",    "experience_required": 2},
+    {"job_title": "Java Backend Engineer",     "job_description": "Design scalable microservices with Java Spring Boot.",    "department": "Engineering",    "experience_required": 4},
+    {"job_title": "Data Scientist",            "job_description": "Build ML models for business insights. Python required.", "department": "Data Science",   "experience_required": 3},
+    {"job_title": "DevOps Engineer",           "job_description": "Manage CI/CD, Kubernetes, and cloud infrastructure.",     "department": "Infrastructure", "experience_required": 3},
+    {"job_title": "HR Business Partner",       "job_description": "Drive talent acquisition and employee engagement.",       "department": "Human Resources","experience_required": 5},
+]
+

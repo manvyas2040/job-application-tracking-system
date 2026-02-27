@@ -1,6 +1,3 @@
-"""
-Job Application Tracking System - Main Application
-"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -45,6 +42,4 @@ def root():
     """API root endpoint"""
     return {
         "message": "Job Application Tracking System API",
-        "version": "1.0.0",
-        "status": "active"
     }

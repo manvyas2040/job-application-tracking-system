@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from ..Models import User, AuditLog, CandidateNotification
 
-# State Transitions
+
 JOB_TRANSITIONS = {
     "draft": {"open", "archived"},
     "open": {"closed"},
