@@ -63,11 +63,11 @@ def get_my_interviews(
                 "email": candidate_user.email if candidate_user else "Unknown",
                 "phone": candidate.phone,
                 "skills": candidate.skills,
-                "experience_years": candidate.experience_year,
+                "experience_years": candidate.experience_years,
             },
             "job": {
                 "job_id": job.job_id,
-                "job_title": job.job_titel,
+                "job_title": job.job_title,
                 "department": job.department,
             },
             "feedback": {

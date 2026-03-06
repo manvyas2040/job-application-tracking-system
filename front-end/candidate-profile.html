@@ -39,8 +39,8 @@
         requireAuth();
 
         const user = getUser();
-        if (user.role !== 'hr' && user.role !== 'admin') {
-            alert('Access denied. HR/Admin only.');
+        if (user.role !== 'hr' && user.role !== 'admin' && user.role !== 'interviewer') {
+            alert('Access denied. HR/Admin/interviewer only.');
             window.location.href = 'dashboard.html';
         }
 

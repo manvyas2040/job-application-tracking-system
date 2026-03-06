@@ -39,10 +39,10 @@ def create_job(
     
     row = Job(
         owner_hr_id=actor.user_id,
-        job_titel=payload.job_title,
+        job_title=payload.job_title,
         job_description=payload.job_description,
         department=payload.department,
-        experienc_required=payload.experience_required,
+        experience_required=payload.experience_required,
         job_status="draft",
     )
     db.add(row)

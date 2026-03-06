@@ -123,7 +123,7 @@
                 } else {
                     jobsContainer.innerHTML = recentJobs.map(job => `
                         <div class="job-card" onclick="window.location.href='job-detail.html?id=${job.job_id}'">
-                            <h3>${job.job_titel}</h3>
+                            <h3>${job.job_title}</h3>
                             <p>${job.job_description.substring(0, 100)}...</p>
                             <div class="job-meta">
                                 <span class="badge badge-${job.job_status}">${job.job_status}</span>

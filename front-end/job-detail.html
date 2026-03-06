@@ -61,11 +61,11 @@
                     <div style="background: white; padding: 30px; border-radius: 12px; border: 2px solid var(--border);">
                         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
                             <div>
-                                <h1 style="margin-bottom: 10px;">${job.job_titel}</h1>
+                                <h1 style="margin-bottom: 10px;">${job.job_title}</h1>
                                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                                     <span class="badge badge-${job.job_status}">${job.job_status}</span>
                                     <span class="badge badge-draft">${job.department}</span>
-                                    <span class="badge badge-draft">Experience: ${job.experienc_required} years</span>
+                                    <span class="badge badge-draft">Experience: ${job.experience_required} years</span>
                                 </div>
                             </div>
                             ${user.role === 'candidate' && job.job_status === 'open' ? `

@@ -163,7 +163,7 @@ async function handleLogin(event) {
         // Decode token to get user info
         const payload = JSON.parse(atob(data.access_token.split('.')[1]));
         setUser({
-            user_id: payload.user_id,
+            user_id: payload.sub,
             email: email,
             role: payload.role,
         });
@@ -212,12 +212,12 @@ async function loadJobs() {
 
         container.innerHTML = jobs.map(job => `
             <div class="job-card" onclick="viewJob(${job.job_id})">
-                <h3>${job.job_titel}</h3>
+                <h3>${job.job_title}</h3>
                 <p>${job.job_description.substring(0, 150)}${job.job_description.length > 150 ? '...' : ''}</p>
                 <div class="job-meta">
                     <span class="badge badge-${job.job_status}">${job.job_status}</span>
                     <span class="badge badge-draft">${job.department}</span>
-                    <span class="badge badge-draft">Exp: ${job.experienc_required} years</span>
+                    <span class="badge badge-draft">Exp: ${job.experience_required} years</span>
                 </div>
             </div>
         `).join('');

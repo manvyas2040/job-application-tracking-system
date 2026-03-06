@@ -32,7 +32,7 @@ class Candidate(Base):
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False, unique=True)
     phone = Column(String, nullable=True)
     skills = Column(Text, nullable=True)
-    experience_year = Column(Integer, nullable=True)
+    experience_years = Column(Integer, nullable=True)
     resume_path = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -45,10 +45,10 @@ class Job(Base):
 
     job_id = Column(Integer, primary_key=True, index=True)
     owner_hr_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)
-    job_titel = Column(String, nullable=False)
+    job_title = Column(String, nullable=False)
     job_description = Column(Text, nullable=False)
     department = Column(String, nullable=True)
-    experienc_required = Column(Integer, nullable=True)
+    experience_required = Column(Integer, nullable=True)
     job_status = Column(String, default="draft")
     posted_date = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)

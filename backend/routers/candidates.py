@@ -33,7 +33,7 @@ def _build_full_candidate_payload(db: Session, candidate: Candidate) -> dict:
         "profile": {
             "phone": candidate.phone,
             "skills": candidate.skills,
-            "experience_years": candidate.experience_year,
+            "experience_years": candidate.experience_years,
             "resume_path": candidate.resume_path,
         },
         "applications": applications,
@@ -74,7 +74,7 @@ def create_candidate_profile(
         user_id=user.user_id,
         phone=payload.phone,
         skills=payload.skills,
-        experience_year=payload.experience_years,
+        experience_years=payload.experience_years,
         resume_path=payload.resume_path,
     )
     db.add(profile)
@@ -102,7 +102,7 @@ def update_candidate_profile(
     if payload.skills is not None:
         profile.skills = payload.skills
     if payload.experience_years is not None:
-        profile.experience_year = payload.experience_years
+        profile.experience_years = payload.experience_years
     if payload.resume_path is not None:
         profile.resume_path = payload.resume_path
 
@@ -184,7 +184,7 @@ def search_candidates(
         query = query.filter(Candidate.skills.ilike(f"%{skill}%"))
 
     if min_exp is not None:
-        query = query.filter(Candidate.experience_year >= min_exp)
+        query = query.filter(Candidate.experience_years >= min_exp)
 
     total = query.count()
 

@@ -109,7 +109,7 @@
             <form id="feedback-form" onsubmit="submitFeedback(event)">
                 <input type="hidden" id="feedback-interview-id">
                 <div class="form-group">
-                    <label>Rating (1-10) *</label>
+                    <label>Rating (1-5) *</label>
                     <input type="number" id="feedback-rating" required min="1" max="10" placeholder="1-10">
                 </div>
                 <div class="form-group">
@@ -424,7 +424,7 @@
             hideError('feedback-error');
 
             try {
-                await apiCall('/feedback', {
+                await apiCall('/interviews/feedback', {
                     method: 'POST',
                     body: JSON.stringify({
                         interview_id: interviewId,
