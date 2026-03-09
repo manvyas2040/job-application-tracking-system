@@ -1,6 +1,17 @@
 // API Configuration
 const API_URL = 'http://localhost:8000';
 
+// XSS Protection
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // Helper Functions
 function getToken() {
     return localStorage.getItem('access_token');
@@ -211,13 +222,13 @@ async function loadJobs() {
         }
 
         container.innerHTML = jobs.map(job => `
-            <div class="job-card" onclick="viewJob(${job.job_id})">
-                <h3>${job.job_title}</h3>
-                <p>${job.job_description.substring(0, 150)}${job.job_description.length > 150 ? '...' : ''}</p>
+            <div class="job-card" onclick="viewJob(${parseInt(job.job_id)})">
+                <h3>${escapeHtml(job.job_title)}</h3>
+                <p>${escapeHtml(job.job_description.substring(0, 150))}${job.job_description.length > 150 ? '...' : ''}</p>
                 <div class="job-meta">
-                    <span class="badge badge-${job.job_status}">${job.job_status}</span>
-                    <span class="badge badge-draft">${job.department}</span>
-                    <span class="badge badge-draft">Exp: ${job.experience_required} years</span>
+                    <span class="badge badge-${escapeHtml(job.job_status)}">${escapeHtml(job.job_status)}</span>
+                    <span class="badge badge-draft">${escapeHtml(job.department)}</span>
+                    <span class="badge badge-draft">Exp: ${parseInt(job.experience_required)} years</span>
                 </div>
             </div>
         `).join('');
@@ -235,7 +246,8 @@ async function loadApplications() {
     container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading applications...</p></div>';
 
     try {
-        const applications = await apiCall('/applications');
+        const data = await apiCall('/applications');
+        const applications = data.items || [];
         
         if (applications.length === 0) {
             container.innerHTML = '<p style="text-align:center;padding:40px;color:#64748b;">No applications found</p>';
@@ -256,12 +268,12 @@ async function loadApplications() {
                 <tbody>
                     ${applications.map(app => `
                         <tr>
-                            <td>${app.application_id}</td>
-                            <td>${app.job_id}</td>
-                            <td><span class="badge badge-${app.application_status}">${app.application_status}</span></td>
+                            <td>${parseInt(app.application_id)}</td>
+                            <td>${parseInt(app.job_id)}</td>
+                            <td><span class="badge badge-${escapeHtml(app.application_status)}">${escapeHtml(app.application_status)}</span></td>
                             <td>${new Date(app.applied_date).toLocaleDateString()}</td>
                             <td>
-                                <button class="btn btn-sm btn-primary" onclick="viewApplication(${app.application_id})">View</button>
+                                <button class="btn btn-sm btn-primary" onclick="viewApplication(${parseInt(app.application_id)})">View</button>
                             </td>
                         </tr>
                     `).join('')}

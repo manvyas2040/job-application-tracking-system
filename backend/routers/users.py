@@ -24,10 +24,14 @@ def list_users(
     require_roles("admin")(current)
     _current_db_user(current, db)
 
-    q = db.query(User).filter(User.is_active.is_(True))
+    q = db.query(User)
     if role:
         q = q.filter(User.role == role)
-    if status_filter:
+    if status_filter == "active":
+        q = q.filter(User.is_active.is_(True))
+    elif status_filter == "inactive":
+        q = q.filter(User.is_active.is_(False))
+    elif status_filter:
         q = q.filter(User.status == status_filter)
     total = q.count()
     items = q.offset((page - 1) * page_size).limit(page_size).all()

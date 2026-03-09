@@ -55,29 +55,40 @@ def apply_job(
 
 
 @router.get("")
-def list_applications(current=Depends(get_current_user), db: Session = Depends(get_db)):
+def list_applications(
+    page: int = 1,
+    page_size: int = 20,
+    current=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """List applications based on user role"""
     user = _current_db_user(current, db)
-    
-    if user.role == "admin":
-        return db.query(Application).all()
 
-    if user.role == "interviewer":
-        return (
-            db.query(Application)
-            .join(Interview, Interview.application_id == Application.application_id)
+    q = db.query(Application)
+
+    if user.role == "admin" or user.role == "hr":
+        pass  # no extra filter
+    elif user.role == "interviewer":
+        q = (
+            q.join(Interview, Interview.application_id == Application.application_id)
             .filter(Interview.interviewer_id == user.user_id)
-            .all()
         )
-    
-    if user.role == "candidate":
+    elif user.role == "candidate":
         c = db.query(Candidate).filter(Candidate.user_id == user.user_id).first()
-        return db.query(Application).filter(Application.candidate_id == c.candidate_id).all() if c else []
-    
-    if user.role == "hr":
-        return db.query(Application).all()
-    
-    return []
+        if not c:
+            return {"total": 0, "page": page, "page_size": page_size, "items": []}
+        q = q.filter(Application.candidate_id == c.candidate_id)
+    else:
+        return {"total": 0, "page": page, "page_size": page_size, "items": []}
+
+    total = q.count()
+    items = (
+        q.order_by(Application.applied_date.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return {"total": total, "page": page, "page_size": page_size, "items": items}
 
 
 @router.patch("/{application_id}/state")

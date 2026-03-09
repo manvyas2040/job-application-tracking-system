@@ -27,15 +27,17 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
                                                 
     role = _normalize_role(payload.role)
 
-    admin_exists = db.query(User).filter(func.lower(User.role) == "admin").first() is not None
-    is_first_admin = role == "admin" and not admin_exists
+    if role == "admin":
+        admin_exists = db.query(User).filter(func.lower(User.role) == "admin").first() is not None
+        if admin_exists:
+            raise HTTPException(status_code=403, detail="Admin registration is not allowed. Contact an existing admin.")
 
     user = User(
         name=payload.name,
         email=payload.email,
         password=hash_password(payload.password),
         role=role,
-        status="active",  # All users active initially
+        status="active", 
         is_active=True,
         token_version=1,
     )

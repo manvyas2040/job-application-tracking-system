@@ -13,7 +13,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
-
+    
 
 class UserResponse(UserBase):
     user_id: int
@@ -174,7 +174,7 @@ class InterviewUpdate(BaseModel):
 class InterviewFeedbackBase(BaseModel):
     interview_id: int
     interviewer_id: int
-    rating: Optional[float] = Field(gt=0, lt=6, default=None)
+    rating: Optional[float] = Field(default=None, gt=0, lt=6)
     comments: Optional[str] = None
     recommendation: Optional[str] = None
 

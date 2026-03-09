@@ -138,23 +138,23 @@
                         <tbody>
                             ${users.map(u => `
                                 <tr>
-                                    <td>${u.user_id}</td>
-                                    <td>${u.name}</td>
-                                    <td>${u.email}</td>
-                                    <td><span class="badge badge-draft" style="text-transform: capitalize;">${u.role}</span></td>
-                                    <td><span class="badge badge-${u.status === 'active' ? 'open' : 'closed'}">${u.status}</span></td>
+                                    <td>${parseInt(u.user_id)}</td>
+                                    <td>${escapeHtml(u.name)}</td>
+                                    <td>${escapeHtml(u.email)}</td>
+                                    <td><span class="badge badge-draft" style="text-transform: capitalize;">${escapeHtml(u.role)}</span></td>
+                                    <td><span class="badge badge-${u.status === 'active' ? 'open' : 'closed'}">${escapeHtml(u.status)}</span></td>
                                     <td>${u.is_active ? '✅' : '❌'}</td>
                                     <td>
                                         <div style="display: flex; gap: 5px;">
-                                            <button class="btn btn-sm btn-primary" onclick="openChangeRoleModal(${u.user_id}, '${u.name}', '${u.role}')">
+                                            <button class="btn btn-sm btn-primary" onclick="openChangeRoleModal(${parseInt(u.user_id)}, '${escapeHtml(u.name)}', '${escapeHtml(u.role)}')">
                                                 Change Role
                                             </button>
                                             ${u.is_active ? `
-                                                <button class="btn btn-sm btn-danger" onclick="deactivateUser(${u.user_id})">
+                                                <button class="btn btn-sm btn-danger" onclick="deactivateUser(${parseInt(u.user_id)})">
                                                     Deactivate
                                                 </button>
                                             ` : `
-                                                <button class="btn btn-sm btn-success" onclick="restoreUser(${u.user_id})">
+                                                <button class="btn btn-sm btn-success" onclick="restoreUser(${parseInt(u.user_id)})">
                                                     Restore
                                                 </button>
                                             `}

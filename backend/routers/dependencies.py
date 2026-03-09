@@ -55,7 +55,6 @@ def _current_db_user(current: dict, db: Session) -> User:
 def _audit(db: Session, user_id: int, action: str):
     """Log an audit entry"""
     db.add(AuditLog(user_id=user_id, action=action))
-    db.commit()
 
 
 def _notify(db: Session, candidate_id: int, message: str, notification_type: str = "info", app_id: int | None = None):

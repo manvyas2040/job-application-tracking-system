@@ -70,8 +70,8 @@
                         <tbody>
                             ${logs.map(log => `
                                 <tr>
-                                    <td>${log.log_id}</td>
-                                    <td>${log.user_id}</td>
+                                    <td>${parseInt(log.log_id)}</td>
+                                    <td>${parseInt(log.user_id)}</td>
                                     <td>
                                         <span class="badge ${
                                             log.action.includes('password') ? 'badge-closed' :
@@ -79,7 +79,7 @@
                                             log.action.includes('deactivated') ? 'badge-rejected' :
                                             'badge-draft'
                                         }">
-                                            ${log.action}
+                                            ${escapeHtml(log.action)}
                                         </span>
                                     </td>
                                     <td>${new Date(log.timestamp).toLocaleString()}</td>

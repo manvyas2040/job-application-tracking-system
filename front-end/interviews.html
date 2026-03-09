@@ -110,7 +110,7 @@
                 <input type="hidden" id="feedback-interview-id">
                 <div class="form-group">
                     <label>Rating (1-5) *</label>
-                    <input type="number" id="feedback-rating" required min="1" max="10" placeholder="1-10">
+                    <input type="number" id="feedback-rating" required min="1" max="5" placeholder="1-5">
                 </div>
                 <div class="form-group">
                     <label>Comments *</label>
@@ -215,7 +215,8 @@
             const container = document.getElementById('shortlisted-container');
             
             try {
-                const applications = await apiCall('/applications');
+                const data = await apiCall('/applications');
+                const applications = data.items || [];
                 const shortlisted = applications.filter(app => app.application_status === 'shortlisted');
 
                 if (shortlisted.length === 0) {
@@ -273,9 +274,9 @@
                             <div style="background: white; padding: 20px; border-radius: 12px; border: 2px solid var(--border);">
                                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
                                     <div>
-                                        <h3 style="margin: 0 0 5px 0;">Interview #${item.interview.interview_id}</h3>
+                                        <h3 style="margin: 0 0 5px 0;">Interview #${parseInt(item.interview.interview_id)}</h3>
                                         <p style="margin: 0; color: var(--secondary);">
-                                            <strong>Candidate:</strong> <a href="#" onclick="viewCandidateProfile(${item.candidate.candidate_id}); return false;" style="color: var(--primary); text-decoration: underline;">${item.candidate.name}</a>
+                                            <strong>Candidate:</strong> <a href="#" onclick="viewCandidateProfile(${parseInt(item.candidate.candidate_id)}); return false;" style="color: var(--primary); text-decoration: underline;">${escapeHtml(item.candidate.name)}</a>
                                         </p>
                                     </div>
                                     <span class="badge badge-${item.interview.interview_status}">${item.interview.interview_status}</span>
@@ -288,11 +289,11 @@
                                     </div>
                                     <div>
                                         <strong>Type:</strong><br>
-                                        ${item.interview.interview_type}
+                                        ${escapeHtml(item.interview.interview_type)}
                                     </div>
                                     <div>
                                         <strong>Job:</strong><br>
-                                        ${item.job.job_title} (${item.job.department})
+                                        ${escapeHtml(item.job.job_title)} (${escapeHtml(item.job.department)})
                                     </div>
                                     <div>
                                         <strong>Application Status:</strong><br>
@@ -307,11 +308,11 @@
                                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
                                         <div>
                                             <strong>Email:</strong><br>
-                                            ${item.candidate.email}
+                                            ${escapeHtml(item.candidate.email)}
                                         </div>
                                         <div>
                                             <strong>Phone:</strong><br>
-                                            ${item.candidate.phone}
+                                            ${escapeHtml(item.candidate.phone)}
                                         </div>
                                         <div>
                                             <strong>Experience:</strong><br>
@@ -322,7 +323,7 @@
                                         <strong>Skills:</strong><br>
                                         <div style="margin-top: 8px;">
                                             ${item.candidate.skills.split(',').map(skill => 
-                                                `<span class="badge badge-draft" style="margin: 3px;">${skill.trim()}</span>`
+                                                `<span class="badge badge-draft" style="margin: 3px;">${escapeHtml(skill.trim())}</span>`
                                             ).join('')}
                                         </div>
                                     </div>
@@ -335,7 +336,7 @@
                                         </button>
                                     ` : ''}
                                     ${item.interview.interview_status === 'scheduled' ? `
-                                        <button class="btn btn-sm btn-primary" onclick="openRescheduleInterviewModal(${item.interview.interview_id}, '${item.interview.interview_date}')">
+                                        <button class="btn btn-sm btn-primary" onclick="openRescheduleModal(${item.interview.interview_id}, '${item.interview.interview_date}')">
                                             Request Reschedule
                                         </button>
                                     ` : ''}
@@ -345,7 +346,7 @@
                                     ${item.feedback ? `
                                         <div style="background: #efe; padding: 10px; border-radius: 8px; flex: 1; min-width: 200px;">
                                             <strong>✓ Feedback Submitted</strong><br>
-                                            <small>Rating: ${item.feedback.rating}/10 | ${item.feedback.recommendation}</small>
+                                            <small>Rating: ${parseInt(item.feedback.rating)}/5 | ${escapeHtml(item.feedback.recommendation)}</small>
                                         </div>
                                     ` : ''}
                                 </div>
@@ -511,9 +512,6 @@
             }
         }
 
-        function viewCandidateProfile(candidateId) {
-            window.location.href = `candidate-profile.html?id=${candidateId}`;
-        }
     </script>
 </body>
 </html>

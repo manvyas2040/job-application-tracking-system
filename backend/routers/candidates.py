@@ -7,6 +7,7 @@ from ..Database import get_db
 from ..Models import Application, Candidate, Interview, User
 from ..schemas import CandidateUpdate
 from .dependencies import _current_db_user
+from .interviews import _auto_complete_overdue
 
 router = APIRouter(tags=["Candidates"])
 
@@ -137,7 +138,8 @@ def get_full_candidate_profile(
     candidate = db.query(Candidate).filter(Candidate.candidate_id == candidate_id).first()
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    
+
+    _auto_complete_overdue(db)
     return _build_full_candidate_payload(db, candidate)
 
 

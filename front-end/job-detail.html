@@ -61,15 +61,15 @@
                     <div style="background: white; padding: 30px; border-radius: 12px; border: 2px solid var(--border);">
                         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
                             <div>
-                                <h1 style="margin-bottom: 10px;">${job.job_title}</h1>
+                                <h1 style="margin-bottom: 10px;">${escapeHtml(job.job_title)}</h1>
                                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                                    <span class="badge badge-${job.job_status}">${job.job_status}</span>
-                                    <span class="badge badge-draft">${job.department}</span>
-                                    <span class="badge badge-draft">Experience: ${job.experience_required} years</span>
+                                    <span class="badge badge-${escapeHtml(job.job_status)}">${escapeHtml(job.job_status)}</span>
+                                    <span class="badge badge-draft">${escapeHtml(job.department)}</span>
+                                    <span class="badge badge-draft">Experience: ${parseInt(job.experience_required)} years</span>
                                 </div>
                             </div>
                             ${user.role === 'candidate' && job.job_status === 'open' ? `
-                                <button class="btn btn-success" onclick="applyToJob(${job.job_id})">
+                                <button class="btn btn-success" onclick="applyToJob(${parseInt(job.job_id)})">
                                     Apply Now
                                 </button>
                             ` : ''}
@@ -77,7 +77,7 @@
 
                         <div style="margin-top: 30px;">
                             <h3 style="margin-bottom: 15px;">Job Description</h3>
-                            <p style="line-height: 1.8; color: var(--secondary); white-space: pre-wrap;">${job.job_description}</p>
+                            <p style="line-height: 1.8; color: var(--secondary); white-space: pre-wrap;">${escapeHtml(job.job_description)}</p>
                         </div>
 
                         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border);">

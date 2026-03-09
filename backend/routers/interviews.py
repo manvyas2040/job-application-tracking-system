@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -8,7 +10,26 @@ from ..Models import Application, Candidate, Interview, InterviewFeedback, Job, 
 from ..schemas import InterviewCreate, InterviewFeedbackCreate, InterviewUpdate
 from .dependencies import APP_TRANSITIONS, INTERVIEW_TRANSITIONS, _current_db_user, _notify
 
+INTERVIEW_DURATION = timedelta(hours=1)
+
 router = APIRouter(prefix="/interviews", tags=["Interviews"])
+
+
+def _auto_complete_overdue(db: Session):
+    """Auto-mark past interviews as 'completed' if still scheduled/rescheduled."""
+    now = datetime.utcnow()
+    overdue = (
+        db.query(Interview)
+        .filter(
+            Interview.interview_date < now,
+            Interview.interview_status.in_(["scheduled", "rescheduled"]),
+        )
+        .all()
+    )
+    for row in overdue:
+        row.interview_status = "completed"
+    if overdue:
+        db.commit()
 
 
 @router.get("/my")
@@ -19,6 +40,8 @@ def get_my_interviews(
     """Get interviews assigned to current interviewer"""
     user = _current_db_user(current, db)
     require_roles("interviewer")(current)
+
+    _auto_complete_overdue(db)
     
     interviews = (
         db.query(Interview)
@@ -81,6 +104,81 @@ def get_my_interviews(
     return result
 
 
+@router.get("/candidate")
+def get_candidate_interviews(
+    current=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get interviews for the current candidate's applications"""
+    user = _current_db_user(current, db)
+    require_roles("candidate")(current)
+
+    _auto_complete_overdue(db)
+
+    candidate = db.query(Candidate).filter(Candidate.user_id == user.user_id).first()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate profile not found")
+
+    applications = db.query(Application).filter(Application.candidate_id == candidate.candidate_id).all()
+    app_ids = [a.application_id for a in applications]
+
+    interviews = db.query(Interview).filter(Interview.application_id.in_(app_ids)).all() if app_ids else []
+
+    result = []
+    for interview in interviews:
+        app = next((a for a in applications if a.application_id == interview.application_id), None)
+        job = db.query(Job).filter(Job.job_id == app.job_id).first() if app else None
+
+        result.append({
+            "interview_id": interview.interview_id,
+            "application_id": interview.application_id,
+            "interview_date": interview.interview_date,
+            "interview_type": interview.interview_type,
+            "interview_status": interview.interview_status,
+            "job_title": job.job_title if job else "Unknown",
+            "department": job.department if job else "Unknown",
+        })
+
+    return result
+
+
+@router.get("/application/{application_id}")
+def get_interviews_for_application(
+    application_id: int,
+    current=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get interviews for a specific application"""
+    user = _current_db_user(current, db)
+
+    _auto_complete_overdue(db)
+
+    app_row = db.query(Application).filter(Application.application_id == application_id).first()
+    if not app_row:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    # Candidates can only see their own application's interviews
+    if current["role"] == "candidate":
+        candidate = db.query(Candidate).filter(Candidate.user_id == user.user_id).first()
+        if not candidate or app_row.candidate_id != candidate.candidate_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    interviews = db.query(Interview).filter(Interview.application_id == application_id).all()
+
+    result = []
+    for interview in interviews:
+        interviewer = db.query(User).filter(User.user_id == interview.interviewer_id).first()
+        result.append({
+            "interview_id": interview.interview_id,
+            "interview_date": interview.interview_date,
+            "interview_type": interview.interview_type,
+            "interview_status": interview.interview_status,
+            "interviewer_name": interviewer.name if interviewer else "Unknown",
+        })
+
+    return result
+
+
 @router.post("")
 def create_interview(
     payload: InterviewCreate,
@@ -98,12 +196,15 @@ def create_interview(
     job = db.query(Job).filter(Job.job_id == app_row.job_id).first()
     enforce_owner_or_admin(current, job.owner_hr_id)
 
-    # Check for interviewer conflicts
+    # Check for interviewer conflicts (within 1 hour window)
+    range_start = payload.interview_date - INTERVIEW_DURATION
+    range_end = payload.interview_date + INTERVIEW_DURATION
     conflict = (
         db.query(Interview)
         .filter(
             Interview.interviewer_id == payload.interviewer_id,
-            Interview.interview_date == payload.interview_date,
+            Interview.interview_date >= range_start,
+            Interview.interview_date <= range_end,
             Interview.interview_status.in_(["scheduled", "rescheduled"]),
         )
         .first()
@@ -136,6 +237,8 @@ def update_interview(
 ):
     """Update interview details"""
     _current_db_user(current, db)
+    require_roles("HR", "admin")(current)
+    
     row = db.query(Interview).filter(Interview.interview_id == interview_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -223,14 +326,17 @@ def reschedule_interview(
     if current["role"] in ["hr", "admin"]:
         enforce_owner_or_admin(current, job.owner_hr_id)
     
-    # Check for conflicts with new date if provided
+    # Check for conflicts with new date if provided (within 1 hour window)
     if payload.interview_date:
+        range_start = payload.interview_date - INTERVIEW_DURATION
+        range_end = payload.interview_date + INTERVIEW_DURATION
         conflict = (
             db.query(Interview)
             .filter(
                 Interview.interview_id != interview_id,
                 Interview.interviewer_id == row.interviewer_id,
-                Interview.interview_date == payload.interview_date,
+                Interview.interview_date >= range_start,
+                Interview.interview_date <= range_end,
                 Interview.interview_status.in_(["scheduled", "rescheduled"]),
             )
             .first()

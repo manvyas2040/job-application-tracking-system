@@ -67,7 +67,8 @@
             container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
 
             try {
-                const applications = await apiCall('/applications');
+                const data = await apiCall('/applications');
+                const applications = data.items || [];
                 
                 if (applications.length === 0) {
                     container.innerHTML = '<p style="text-align:center; padding:40px; color:var(--secondary);">No applications found</p>';
@@ -88,12 +89,12 @@
                         <tbody>
                             ${applications.map(app => `
                                 <tr>
-                                    <td>${app.application_id}</td>
-                                    <td>${app.job_id}</td>
-                                    <td><span class="badge badge-${app.application_status}">${app.application_status}</span></td>
+                                    <td>${parseInt(app.application_id)}</td>
+                                    <td>${parseInt(app.job_id)}</td>
+                                    <td><span class="badge badge-${escapeHtml(app.application_status)}">${escapeHtml(app.application_status)}</span></td>
                                     <td>${new Date(app.applied_date).toLocaleDateString()}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-primary" onclick="window.location.href='application-detail.html?id=${app.application_id}'">
+                                        <button class="btn btn-sm btn-primary" onclick="window.location.href='application-detail.html?id=${parseInt(app.application_id)}'">
                                             View Details
                                         </button>
                                     </td>

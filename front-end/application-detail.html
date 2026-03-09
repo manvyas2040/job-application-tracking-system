@@ -184,7 +184,8 @@
             const container = document.getElementById('application-detail-container');
 
             try {
-                const applications = await apiCall('/applications');
+                const data = await apiCall('/applications');
+                const applications = data.items || [];
                 const app = applications.find(a => a.application_id == applicationId);
 
                 if (!app) {
@@ -205,15 +206,23 @@
                     }
                 }
 
+                // Get interview details for this application (all roles)
+                let interviewData = [];
+                try {
+                    interviewData = await apiCall(`/interviews/application/${app.application_id}`);
+                } catch (error) {
+                    console.log('Could not load interview data:', error);
+                }
+
                 const canChangeStatus = user.role === 'hr' || user.role === 'admin';
                 const canScheduleInterview = (user.role === 'hr' || user.role === 'admin') && 
                                             (app.application_status === 'shortlisted');
 
                 container.innerHTML = `
                     <div style="background: white; padding: 30px; border-radius: 12px; border: 2px solid var(--border);">
-                        <h2 style="margin-bottom: 10px;">Application #${app.application_id}</h2>
+                        <h2 style="margin-bottom: 10px;">Application #${parseInt(app.application_id)}</h2>
                         <div style="display: flex; gap: 10px; margin-bottom: 30px;">
-                            <span class="badge badge-${app.application_status}">${app.application_status}</span>
+                            <span class="badge badge-${escapeHtml(app.application_status)}">${escapeHtml(app.application_status)}</span>
                             <span class="badge badge-draft">${new Date(app.applied_date).toLocaleDateString()}</span>
                         </div>
 
@@ -232,8 +241,8 @@
                                 </div>
                                 <div>
                                     <strong>Status:</strong>
-                                    <span class="badge badge-${app.application_status}" style="margin-left: 10px;">
-                                        ${app.application_status}
+                                    <span class="badge badge-${escapeHtml(app.application_status)}" style="margin-left: 10px;">
+                                        ${escapeHtml(app.application_status)}
                                     </span>
                                 </div>
                                 <div>
@@ -247,24 +256,24 @@
                             <h3>Job Details</h3>
                             <div style="margin-top: 15px;">
                                 <div style="margin-bottom: 15px;">
-                                    <strong>Title:</strong> ${job.job_title}
+                                    <strong>Title:</strong> ${escapeHtml(job.job_title)}
                                 </div>
                                 <div style="margin-bottom: 15px;">
-                                    <strong>Department:</strong> ${job.department}
+                                    <strong>Department:</strong> ${escapeHtml(job.department)}
                                 </div>
                                 <div style="margin-bottom: 15px;">
-                                    <strong>Experience Required:</strong> ${job.experience_required} years
+                                    <strong>Experience Required:</strong> ${parseInt(job.experience_required)} years
                                 </div>
                                 <div style="margin-bottom: 15px;">
                                     <strong>Description:</strong>
                                     <p style="white-space: pre-wrap; margin-top: 10px; color: var(--secondary);">
-                                        ${job.job_description}
+                                        ${escapeHtml(job.job_description)}
                                     </p>
                                 </div>
                                 <div>
                                     <strong>Job Status:</strong> 
-                                    <span class="badge badge-${job.job_status}" style="margin-left: 10px;">
-                                        ${job.job_status}
+                                    <span class="badge badge-${escapeHtml(job.job_status)}" style="margin-left: 10px;">
+                                        ${escapeHtml(job.job_status)}
                                     </span>
                                 </div>
                             </div>
@@ -276,37 +285,41 @@
                                 <h3>Candidate Information</h3>
                                 <div style="margin-top: 15px;">
                                     <div style="margin-bottom: 15px;">
-                                        <strong>Name:</strong> ${candidateData.user.name}
+                                        <strong>Name:</strong> ${escapeHtml(candidateData.user.name)}
                                     </div>
                                     <div style="margin-bottom: 15px;">
-                                        <strong>Email:</strong> ${candidateData.user.email}
+                                        <strong>Email:</strong> ${escapeHtml(candidateData.user.email)}
                                     </div>
                                     <div style="margin-bottom: 15px;">
-                                        <strong>Phone:</strong> ${candidateData.profile.phone}
+                                        <strong>Phone:</strong> ${escapeHtml(candidateData.profile.phone)}
                                     </div>
                                     <div style="margin-bottom: 15px;">
                                         <strong>Skills:</strong><br>
                                         <div style="margin-top: 10px;">
                                             ${candidateData.profile.skills.split(',').map(skill => 
-                                                `<span class="badge badge-draft" style="margin: 5px;">${skill.trim()}</span>`
+                                                `<span class="badge badge-draft" style="margin: 5px;">${escapeHtml(skill.trim())}</span>`
                                             ).join('')}
                                         </div>
                                     </div>
                                     <div style="margin-bottom: 15px;">
-                                        <strong>Experience:</strong> ${candidateData.profile.experience_years} years
+                                        <strong>Experience:</strong> ${parseInt(candidateData.profile.experience_years)} years
                                     </div>
                                     <div>
-                                        <strong>Resume:</strong> ${candidateData.profile.resume_path || 'Not provided'}
+                                        <strong>Resume:</strong> ${escapeHtml(candidateData.profile.resume_path || 'Not provided')}
                                     </div>
                                 </div>
                             </div>
                         ` : ''}
 
-                        <!-- Interview Management (if exists or can schedule) -->
-                        ${app.application_status === 'interview_scheduled' && candidateData && candidateData.interviews && candidateData.interviews.length > 0 ? `
+                        <!-- Interview Details (all roles) -->
+                        ${interviewData && interviewData.length > 0 ? `
                             <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
                                 <h3>Interview Details</h3>
-                                ${candidateData.interviews.map(interview => `
+                                ${interviewData.map(interview => {
+                                    const isPast = new Date(interview.interview_date) < new Date();
+                                    const isCompleted = interview.interview_status === 'completed';
+                                    const awaitingResult = isPast && isCompleted;
+                                    return `
                                     <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 15px;">
                                             <div>
@@ -316,14 +329,24 @@
                                                 <strong>Date:</strong> ${new Date(interview.interview_date).toLocaleString()}
                                             </div>
                                             <div>
-                                                <strong>Type:</strong> ${interview.interview_type}
+                                                <strong>Type:</strong> ${escapeHtml(interview.interview_type)}
                                             </div>
                                             <div>
-                                                <strong>Status:</strong> <span class="badge badge-${interview.interview_status}">${interview.interview_status}</span>
+                                                <strong>Status:</strong>
+                                                <span class="badge badge-${escapeHtml(interview.interview_status)}">${escapeHtml(interview.interview_status)}</span>
+                                                ${awaitingResult ? '<span class="badge" style="background:#f59e0b; color:white; margin-left:5px;">Awaiting Result</span>' : ''}
+                                            </div>
+                                            <div>
+                                                <strong>Interviewer:</strong> ${escapeHtml(interview.interviewer_name)}
                                             </div>
                                         </div>
+                                        ${awaitingResult && user.role === 'candidate' ? `
+                                            <p style="color:#b45309; background:#fef3c7; padding:10px; border-radius:8px; margin:0;">
+                                                Your interview date has passed. Please wait for the result from the interviewer.
+                                            </p>
+                                        ` : ''}
                                         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                            ${(user.role === 'hr' || user.role === 'admin') && interview.interview_status === 'scheduled' ? `
+                                            ${(user.role === 'hr' || user.role === 'admin') && (interview.interview_status === 'scheduled' || interview.interview_status === 'rescheduled') ? `
                                                 <button class="btn btn-sm btn-primary" onclick="openRescheduleInterviewModal(${interview.interview_id}, '${interview.interview_date}')">
                                                     Reschedule
                                                 </button>
@@ -331,14 +354,14 @@
                                                     Cancel Interview
                                                 </button>
                                             ` : ''}
-                                            ${user.role === 'interviewer' && interview.interview_status === 'scheduled' ? `
+                                            ${user.role === 'interviewer' && (interview.interview_status === 'scheduled' || interview.interview_status === 'rescheduled') ? `
                                                 <button class="btn btn-sm btn-primary" onclick="openRescheduleInterviewModal(${interview.interview_id}, '${interview.interview_date}')">
                                                     Request Reschedule
                                                 </button>
                                             ` : ''}
                                         </div>
                                     </div>
-                                `).join('')}
+                                `}).join('')}
                             </div>
                         ` : ''}
 
