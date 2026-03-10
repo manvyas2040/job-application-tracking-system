@@ -6,7 +6,7 @@ from ..authorize import enforce_owner_or_admin, require_roles
 from ..Database import get_db
 from ..Models import Application, Interview, Job
 from ..schemas import JobCreate, JobStateUpdate
-from .dependencies import JOB_TRANSITIONS, _current_db_user
+from .dependencies import JOB_TRANSITIONS, _audit, _current_db_user
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
@@ -48,6 +48,8 @@ def create_job(
     db.add(row)
     db.commit()
     db.refresh(row)
+    _audit(db, actor.user_id, f"job_created:{row.job_id}")
+    db.commit()
     return row
 
 
@@ -77,7 +79,9 @@ def update_job_state(
     if payload.job_status not in JOB_TRANSITIONS.get(row.job_status, set()):
         raise HTTPException(status_code=400, detail="Invalid job state transition")
     
+    old_status = row.job_status
     row.job_status = payload.job_status
+    _audit(db, current["user_id"], f"job_status_changed:{job_id}:{old_status}->{payload.job_status}")
     db.commit()
     return row
 

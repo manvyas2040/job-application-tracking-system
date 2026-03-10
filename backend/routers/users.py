@@ -54,6 +54,7 @@ def update_user(
         require_roles("ADMIN")(current)
         user.status = payload.status
 
+    _audit(db, current["user_id"], f"user_updated:{user_id}")
     db.commit()
     db.refresh(user)
     return user

@@ -330,7 +330,7 @@
                                 </div>
 
                                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                    ${!item.feedback && item.interview.interview_status === 'scheduled' ? `
+                                    ${!item.feedback && (item.interview.interview_status === 'awaiting_feedback' || item.interview.interview_status === 'completed') ? `
                                         <button class="btn btn-sm btn-success" onclick="openFeedbackModal(${item.interview.interview_id})">
                                             Submit Feedback
                                         </button>
@@ -376,6 +376,7 @@
 
         function openScheduleModal(appId) {
             document.getElementById('application-id').value = appId;
+            document.getElementById('interview-date').min = new Date().toISOString().slice(0, 16);
             openModal('schedule-interview-modal');
         }
 
@@ -450,6 +451,7 @@
 
         function openRescheduleModal(interviewId, currentDate) {
             document.getElementById('reschedule-interview-id').value = interviewId;
+            document.getElementById('reschedule-date').min = new Date().toISOString().slice(0, 16);
             // Pre-fill with current date
             if (currentDate) {
                 const dateObj = new Date(currentDate);

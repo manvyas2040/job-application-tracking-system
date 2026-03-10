@@ -6,7 +6,7 @@ from ..authorize import enforce_owner_or_admin, require_roles
 from ..Database import get_db
 from ..Models import Application, Candidate, Interview, Job
 from ..schemas import ApplicationCreate, ApplicationUpdate, BulkStatusUpdate
-from .dependencies import APP_TRANSITIONS, _current_db_user, _notify
+from .dependencies import APP_TRANSITIONS, _audit, _current_db_user, _notify
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
@@ -48,6 +48,7 @@ def apply_job(
     db.commit()
     db.refresh(app_row)
     
+    _audit(db, user.user_id, f"application_created:{app_row.application_id}:job_{payload.job_id}")
     _notify(db, candidate.candidate_id, "Application submitted", "info", app_row.application_id)
     db.commit()
     db.refresh(app_row)
@@ -112,8 +113,10 @@ def update_application_state(
     if payload.application_status not in APP_TRANSITIONS.get(app_row.application_status, set()):
         raise HTTPException(status_code=400, detail="Invalid application transition")
     
+    old_status = app_row.application_status
     app_row.application_status = payload.application_status
 
+    _audit(db, current["user_id"], f"application_status_changed:{application_id}:{old_status}->{payload.application_status}")
     _notify(
         db,
         app_row.candidate_id,

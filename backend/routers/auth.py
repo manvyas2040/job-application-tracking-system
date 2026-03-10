@@ -44,6 +44,8 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+    _audit(db, user.user_id, f"user_created:{user.user_id}:{role}")
+    db.commit()
     return {"user_id": user.user_id, "status": user.status}
 
 

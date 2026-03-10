@@ -19,8 +19,9 @@ APP_TRANSITIONS = {
 }
 
 INTERVIEW_TRANSITIONS = {
-    "scheduled": {"rescheduled", "completed", "cancelled"},
-    "rescheduled": {"completed", "cancelled"},
+    "scheduled": {"rescheduled", "awaiting_feedback", "cancelled"},
+    "rescheduled": {"awaiting_feedback", "cancelled"},
+    "awaiting_feedback": {"completed"},
     "completed": set(),
     "cancelled": set(),
 }

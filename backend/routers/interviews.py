@@ -8,7 +8,7 @@ from ..authorize import enforce_owner_or_admin, require_roles
 from ..Database import get_db
 from ..Models import Application, Candidate, Interview, InterviewFeedback, Job, User
 from ..schemas import InterviewCreate, InterviewFeedbackCreate, InterviewUpdate
-from .dependencies import APP_TRANSITIONS, INTERVIEW_TRANSITIONS, _current_db_user, _notify
+from .dependencies import APP_TRANSITIONS, INTERVIEW_TRANSITIONS, _audit, _current_db_user, _notify
 
 INTERVIEW_DURATION = timedelta(hours=1)
 
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/interviews", tags=["Interviews"])
 
 
 def _auto_complete_overdue(db: Session):
-    """Auto-mark past interviews as 'completed' if still scheduled/rescheduled."""
+    """Auto-mark past interviews as 'awaiting_feedback' if still scheduled/rescheduled."""
     now = datetime.utcnow()
     overdue = (
         db.query(Interview)
@@ -27,7 +27,7 @@ def _auto_complete_overdue(db: Session):
         .all()
     )
     for row in overdue:
-        row.interview_status = "completed"
+        row.interview_status = "awaiting_feedback"
     if overdue:
         db.commit()
 
@@ -188,15 +188,38 @@ def create_interview(
     """Schedule a new interview (HR/Admin)"""
     _current_db_user(current, db)
     require_roles("HR", "admin")(current)
+    current_time = datetime.utcnow()
 
+    # 1. Application must exist
     app_row = db.query(Application).filter(Application.application_id == payload.application_id).first()
     if not app_row:
         raise HTTPException(status_code=404, detail="Application not found")
-    
+
+    # 2. Interview must be in the future
+    if payload.interview_date <= current_time:
+        raise HTTPException(status_code=400, detail="Interview must be scheduled in the future")
+
+    # 3. Job must exist
     job = db.query(Job).filter(Job.job_id == app_row.job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
     enforce_owner_or_admin(current, job.owner_hr_id)
 
-    # Check for interviewer conflicts (within 1 hour window)
+    # 4. Interviewer must exist
+    interviewer = db.query(User).filter(User.user_id == payload.interviewer_id).first()
+    if not interviewer:
+        raise HTTPException(status_code=404, detail="Interviewer not found")
+
+    # 5. Interviewer must have role 'interviewer'
+    if interviewer.role != "interviewer":
+        raise HTTPException(status_code=400, detail="Selected user does not have the interviewer role")
+
+    # 6. Interviewer cannot be the candidate who applied
+    candidate = db.query(Candidate).filter(Candidate.candidate_id == app_row.candidate_id).first()
+    if candidate and candidate.user_id == interviewer.user_id:
+        raise HTTPException(status_code=400, detail="Interviewer cannot be the candidate for this application")
+
+    # 7. Interviewer must be available (no calendar conflict within 1 hour)
     range_start = payload.interview_date - INTERVIEW_DURATION
     range_end = payload.interview_date + INTERVIEW_DURATION
     conflict = (
@@ -212,6 +235,24 @@ def create_interview(
     if conflict:
         raise HTTPException(status_code=400, detail="Interviewer has a calendar conflict")
 
+    # 8. Candidate must be available (no conflicting interview at the same time)
+    candidate_app_ids = [
+        a.application_id
+        for a in db.query(Application).filter(Application.candidate_id == app_row.candidate_id).all()
+    ]
+    candidate_conflict = (
+        db.query(Interview)
+        .filter(
+            Interview.application_id.in_(candidate_app_ids),
+            Interview.interview_date >= range_start,
+            Interview.interview_date <= range_end,
+            Interview.interview_status.in_(["scheduled", "rescheduled"]),
+        )
+        .first()
+    )
+    if candidate_conflict:
+        raise HTTPException(status_code=400, detail="Candidate already has an interview scheduled at this time")
+
     row = Interview(
         application_id=payload.application_id,
         interview_date=payload.interview_date,
@@ -225,6 +266,8 @@ def create_interview(
     _notify(db, app_row.candidate_id, "Interview scheduled", "info", app_row.application_id)
     db.commit()
     db.refresh(row)
+    _audit(db, current["user_id"], f"interview_scheduled:{row.interview_id}:app_{payload.application_id}")
+    db.commit()
     return row
 
 
@@ -293,6 +336,7 @@ def delete_interview(
     # Notify candidate about interview deletion
     _notify(db, app_row.candidate_id, "Your scheduled interview has been cancelled", "warning", app_row.application_id)
     
+    _audit(db, current["user_id"], f"interview_cancelled:{interview_id}")
     db.commit()
     return {"message": "Interview deleted successfully"}
 
@@ -343,6 +387,25 @@ def reschedule_interview(
         )
         if conflict:
             raise HTTPException(status_code=400, detail="Interviewer has a calendar conflict at new time")
+
+        # Check candidate conflict at new time
+        candidate_app_ids = [
+            a.application_id
+            for a in db.query(Application).filter(Application.candidate_id == app_row.candidate_id).all()
+        ]
+        candidate_conflict = (
+            db.query(Interview)
+            .filter(
+                Interview.interview_id != interview_id,
+                Interview.application_id.in_(candidate_app_ids),
+                Interview.interview_date >= range_start,
+                Interview.interview_date <= range_end,
+                Interview.interview_status.in_(["scheduled", "rescheduled"]),
+            )
+            .first()
+        )
+        if candidate_conflict:
+            raise HTTPException(status_code=400, detail="Candidate already has an interview scheduled at this time")
         
         row.interview_date = payload.interview_date
         row.interview_status = "rescheduled"
@@ -361,6 +424,7 @@ def reschedule_interview(
         app_row.application_id
     )
     
+    _audit(db, current["user_id"], f"interview_rescheduled:{interview_id}")
     db.commit()
     return row
 
@@ -380,8 +444,12 @@ def submit_feedback(
         raise HTTPException(status_code=404, detail="Interview not found")
     if interview.interviewer_id != user.user_id:
         raise HTTPException(status_code=403, detail="Only assigned interviewer can submit feedback")
+    if interview.interview_date > datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Feedback can only be submitted after the interview")
     if db.query(InterviewFeedback).filter(InterviewFeedback.interview_id == interview.interview_id).first():
         raise HTTPException(status_code=400, detail="Feedback is write-once")
+
+    interview.interview_status = "completed"
 
     row = InterviewFeedback(
         interview_id=payload.interview_id,
@@ -393,6 +461,8 @@ def submit_feedback(
     db.add(row)
     db.commit()
     db.refresh(row)
+    _audit(db, user.user_id, f"feedback_submitted:{payload.interview_id}")
+    db.commit()
     return row
 
 

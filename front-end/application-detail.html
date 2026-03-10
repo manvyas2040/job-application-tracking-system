@@ -435,6 +435,7 @@
 
         function openScheduleInterviewModal(appId) {
             document.getElementById('schedule-app-id').value = appId;
+            document.getElementById('schedule-interview-date').min = new Date().toISOString().slice(0, 16);
             loadInterviewersList();
             openModal('schedule-interview-modal');
         }
@@ -484,6 +485,7 @@
 
         function openRescheduleInterviewModal(interviewId, currentDate) {
             document.getElementById('reschedule-interview-id').value = interviewId;
+            document.getElementById('reschedule-new-date').min = new Date().toISOString().slice(0, 16);
             if (currentDate) {
                 const dateObj = new Date(currentDate);
                 const isoString = dateObj.toISOString().slice(0, 16);
