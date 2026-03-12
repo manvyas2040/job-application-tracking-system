@@ -127,6 +127,7 @@ def update_application_state(
     db.commit()
     return app_row
 
+# ------------------  bulk_shortlist / bulk_reject / search_applications  is only for docs test , it's not implement  in front end -----------------#  
 
 @router.post("/bulk-shortlist")
 def bulk_shortlist(
