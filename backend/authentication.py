@@ -46,7 +46,6 @@ def _create_token(subject: str, token_type: str, expires_delta: timedelta, extra
         payload.update(extra)
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
-
 def create_access_token(user_id: int, role: str, token_version: int) -> str:
     return _create_token(
         subject=str(user_id),

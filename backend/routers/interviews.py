@@ -1,6 +1,6 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..authentication import get_current_user
@@ -30,6 +30,136 @@ def _auto_complete_overdue(db: Session):
         row.interview_status = "awaiting_feedback"
     if overdue:
         db.commit()
+
+
+@router.get("")
+def list_interviews_calendar(
+    start: date | None = Query(default=None, description="Start date (YYYY-MM-DD)"),
+    end: date | None = Query(default=None, description="End date (YYYY-MM-DD)"),
+    start_date: date | None = Query(default=None, description="Alternative start date"),
+    end_date: date | None = Query(default=None, description="Alternative end date"),
+    interviewer_id: int | None = Query(default=None),
+    current=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Calendar feed for interviews with role-based visibility and date-range filtering."""
+    user = _current_db_user(current, db)
+    _auto_complete_overdue(db)
+
+    start_val = start or start_date
+    end_val = end or end_date
+
+    q = (
+        db.query(Interview, Application, Candidate, User, Job)
+        .join(Application, Interview.application_id == Application.application_id)
+        .join(Candidate, Application.candidate_id == Candidate.candidate_id)
+        .join(User, Candidate.user_id == User.user_id)
+        .join(Job, Application.job_id == Job.job_id)
+    )
+
+    # Role-based visibility
+    role = (current.get("role") or "").strip().lower()
+    if role == "admin":
+        pass
+    elif role == "hr":
+        q = q.filter(Job.owner_hr_id == user.user_id)
+    elif role == "interviewer":
+        q = q.filter(Interview.interviewer_id == user.user_id)
+    elif role == "candidate":
+        candidate = db.query(Candidate).filter(Candidate.user_id == user.user_id).first()
+        if not candidate:
+            return []
+        q = q.filter(Application.candidate_id == candidate.candidate_id)
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if start_val:
+        q = q.filter(Interview.interview_date >= datetime.combine(start_val, datetime.min.time()))
+    if end_val:
+        q = q.filter(Interview.interview_date <= datetime.combine(end_val, datetime.max.time()))
+
+    if interviewer_id is not None:
+        q = q.filter(Interview.interviewer_id == interviewer_id)
+
+    rows = q.order_by(Interview.interview_date.asc()).all()
+
+    # Gather interviewer names once to avoid repetitive lookups.
+    interviewer_ids = sorted({row[0].interviewer_id for row in rows})
+    interviewer_map = {
+        u.user_id: u.name
+        for u in db.query(User).filter(User.user_id.in_(interviewer_ids)).all()
+    } if interviewer_ids else {}
+
+    events = []
+    for interview, app_row, _candidate_row, candidate_user, _job in rows:
+        start_dt = interview.interview_date
+        end_dt = start_dt + INTERVIEW_DURATION
+        events.append(
+            {
+                "interview_id": interview.interview_id,
+                "title": f"{candidate_user.name} - {interview.interview_type.title()}",
+                "start": start_dt.isoformat(),
+                "end": end_dt.isoformat(),
+                "candidate_name": candidate_user.name,
+                "interview_type": interview.interview_type,
+                "interviewer_id": interview.interviewer_id,
+                "interviewer_name": interviewer_map.get(interview.interviewer_id, "Unknown"),
+                "status": interview.interview_status,
+                "application_id": app_row.application_id,
+            }
+        )
+
+    return events
+
+
+@router.get("/interviewers")
+def list_visible_interviewers(
+    current=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return interviewer options visible to the current user."""
+    user = _current_db_user(current, db)
+
+    role = (current.get("role") or "").strip().lower()
+    q = db.query(User).filter(User.role == "interviewer", User.is_active.is_(True))
+
+    if role == "admin":
+        pass
+    elif role == "hr":
+        interviewer_ids = (
+            db.query(Interview.interviewer_id)
+            .join(Application, Interview.application_id == Application.application_id)
+            .join(Job, Application.job_id == Job.job_id)
+            .filter(Job.owner_hr_id == user.user_id)
+            .distinct()
+            .all()
+        )
+        ids = [row[0] for row in interviewer_ids]
+        if not ids:
+            return []
+        q = q.filter(User.user_id.in_(ids))
+    elif role == "interviewer":
+        q = q.filter(User.user_id == user.user_id)
+    elif role == "candidate":
+        candidate = db.query(Candidate).filter(Candidate.user_id == user.user_id).first()
+        if not candidate:
+            return []
+        interviewer_ids = (
+            db.query(Interview.interviewer_id)
+            .join(Application, Interview.application_id == Application.application_id)
+            .filter(Application.candidate_id == candidate.candidate_id)
+            .distinct()
+            .all()
+        )
+        ids = [row[0] for row in interviewer_ids]
+        if not ids:
+            return []
+        q = q.filter(User.user_id.in_(ids))
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    users = q.order_by(User.name.asc()).all()
+    return [{"user_id": u.user_id, "name": u.name} for u in users]
 
 
 @router.get("/my")

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Interviews - JATS</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
 </head>
 <body>
     <div class="container">
@@ -52,7 +53,26 @@
 
             <!-- All Interviews View -->
             <div id="all-interviews-view">
-                <h3>All Interviews</h3>
+                <div style="display:flex; justify-content:space-between; align-items:end; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+                    <h3 style="margin:0;">Interview Calendar</h3>
+                    <div style="display:flex; gap:10px; align-items:end; flex-wrap:wrap;">
+                        <div class="form-group" style="margin:0; min-width:220px;">
+                            <label>Filter by Interviewer</label>
+                            <select id="calendar-interviewer-filter">
+                                <option value="">All Interviewers</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="refreshCalendar()">Refresh</button>
+                    </div>
+                </div>
+                <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; color:var(--secondary); font-size:0.95rem;">
+                    <span><span style="display:inline-block; width:10px; height:10px; background:#2563eb; border-radius:50%; margin-right:6px;"></span>Scheduled</span>
+                    <span><span style="display:inline-block; width:10px; height:10px; background:#059669; border-radius:50%; margin-right:6px;"></span>Completed</span>
+                    <span><span style="display:inline-block; width:10px; height:10px; background:#dc2626; border-radius:50%; margin-right:6px;"></span>Cancelled</span>
+                    <span><span style="display:inline-block; width:10px; height:10px; background:#d97706; border-radius:50%; margin-right:6px;"></span>Awaiting Feedback</span>
+                    <span><span style="display:inline-block; width:10px; height:10px; background:#7c3aed; border-radius:50%; margin-right:6px;"></span>Rescheduled</span>
+                </div>
+                <div id="calendar" style="background:white; border:2px solid var(--border); border-radius:12px; padding:12px;"></div>
                 <div id="all-interviews-container">
                     <div class="loading"><div class="spinner"></div></div>
                 </div>
@@ -187,12 +207,14 @@
     </div>
 
     <script src="app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
     <script>
         requireAuth();
 
         const user = getUser();
         document.getElementById('user-email').textContent = user.email;
         document.getElementById('user-role').textContent = user.role;
+        let calendar;
 
         const isHR = user.role === 'hr' || user.role === 'admin';
         const isInterviewer = user.role === 'interviewer';
@@ -363,15 +385,94 @@
             const container = document.getElementById('all-interviews-container');
 
             try {
-                // Note: Backend doesn't have GET /interviews, so we'll show a message
-                container.innerHTML = `
-                    <p style="text-align:center; padding:40px; color:var(--secondary);">
-                        Interview details are visible when viewing specific applications
-                    </p>
-                `;
+                container.innerHTML = '';
+                initCalendar();
+                await populateInterviewerFilter();
             } catch (error) {
                 container.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
             }
+        }
+
+        function statusColor(status) {
+            if (status === 'completed') return '#059669';
+            if (status === 'cancelled') return '#dc2626';
+            if (status === 'awaiting_feedback') return '#d97706';
+            if (status === 'rescheduled') return '#7c3aed';
+            return '#2563eb'; // scheduled/default
+        }
+
+        function initCalendar() {
+            if (calendar) return;
+
+            const calendarEl = document.getElementById('calendar');
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                nowIndicator: true,
+                height: 'auto',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay',
+                },
+                events: async function(fetchInfo, successCallback, failureCallback) {
+                    try {
+                        const start = fetchInfo.startStr.slice(0, 10);
+                        const end = fetchInfo.endStr.slice(0, 10);
+                        const interviewerId = document.getElementById('calendar-interviewer-filter').value;
+                        let url = `/interviews?start=${start}&end=${end}`;
+                        if (interviewerId) url += `&interviewer_id=${parseInt(interviewerId)}`;
+
+                        const rows = await apiCall(url);
+                        const events = (rows || []).map(row => ({
+                            id: String(row.interview_id),
+                            title: row.title,
+                            start: row.start,
+                            end: row.end,
+                            backgroundColor: statusColor(row.status),
+                            borderColor: statusColor(row.status),
+                            extendedProps: {
+                                candidate_name: row.candidate_name,
+                                interview_type: row.interview_type,
+                                interviewer_name: row.interviewer_name,
+                                status: row.status,
+                                application_id: row.application_id,
+                            },
+                        }));
+                        successCallback(events);
+                    } catch (e) {
+                        failureCallback(e);
+                    }
+                },
+                eventClick: function(info) {
+                    const p = info.event.extendedProps;
+                    alert(
+                        `Candidate: ${p.candidate_name}\n` +
+                        `Type: ${p.interview_type}\n` +
+                        `Interviewer: ${p.interviewer_name}\n` +
+                        `Status: ${p.status}\n` +
+                        `When: ${new Date(info.event.start).toLocaleString()}`
+                    );
+                },
+            });
+
+            calendar.render();
+        }
+
+        async function populateInterviewerFilter() {
+            const filter = document.getElementById('calendar-interviewer-filter');
+            const interviewers = await apiCall('/interviews/interviewers');
+
+            const options = ['<option value="">All Interviewers</option>'];
+            interviewers.forEach(u => {
+                options.push(`<option value="${parseInt(u.user_id)}">${escapeHtml(u.name)}</option>`);
+            });
+            filter.innerHTML = options.join('');
+
+            filter.onchange = () => refreshCalendar();
+        }
+
+        function refreshCalendar() {
+            if (calendar) calendar.refetchEvents();
         }
 
         function openScheduleModal(appId) {
@@ -404,7 +505,7 @@
                 alert('Interview scheduled successfully!');
                 closeModal('schedule-interview-modal');
                 loadShortlistedApplications();
-                loadAllInterviews();
+                refreshCalendar();
             } catch (error) {
                 showError('schedule-error', error.message);
             }
@@ -483,7 +584,7 @@
                 closeModal('reschedule-modal');
                 loadShortlistedApplications();
                 loadMyInterviews();
-                loadAllInterviews();
+                refreshCalendar();
             } catch (error) {
                 showError('reschedule-error', error.message);
             }
@@ -508,7 +609,7 @@
                 closeModal('delete-modal');
                 loadShortlistedApplications();
                 loadMyInterviews();
-                loadAllInterviews();
+                refreshCalendar();
             } catch (error) {
                 showError('delete-error', error.message);
             }

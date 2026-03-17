@@ -1,14 +1,48 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from ..authentication import get_current_user
+from ..authentication import get_current_user, hash_password
 from ..authorize import enforce_self_or_admin, require_roles
 from ..Database import get_db
 from ..Models import User
-from ..schemas import RoleChangeRequest, UserUpdate
+from ..schemas import RoleChangeRequest, UserCreate, UserUpdate
 from .dependencies import _audit, _current_db_user, _get_user, _normalize_role
 
 router = APIRouter(prefix="/users", tags=["Users"])
+
+
+@router.post("")
+def create_user(
+    payload: UserCreate,
+    current=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Admin creates a user with a specific role (hr or interviewer)."""
+    require_roles("admin")(current)
+    actor = _current_db_user(current, db)
+
+    if db.query(User).filter(User.email == payload.email).first():
+        raise HTTPException(status_code=400, detail="Email already exists")
+
+    role = _normalize_role(payload.role)
+    if role == "admin":
+        raise HTTPException(status_code=403, detail="Cannot create another admin account")
+
+    user = User(
+        name=payload.name,
+        email=payload.email,
+        password=hash_password(payload.password),
+        role=role,
+        status="active",
+        is_active=True,
+        token_version=1,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    _audit(db, actor.user_id, f"user_created_by_admin:{user.user_id}:{role}")
+    db.commit()
+    return {"user_id": user.user_id, "role": user.role, "status": user.status}
 
 
 @router.get("")
