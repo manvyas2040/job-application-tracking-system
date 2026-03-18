@@ -42,7 +42,7 @@ def list_interviews_calendar(
     current=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Calendar feed for interviews with role-based visibility and date-range filtering."""
+    """Calendar feed for interviews with role-based visibility and date filtering."""
     user = _current_db_user(current, db)
     _auto_complete_overdue(db)
 
@@ -57,7 +57,6 @@ def list_interviews_calendar(
         .join(Job, Application.job_id == Job.job_id)
     )
 
-    # Role-based visibility
     role = (current.get("role") or "").strip().lower()
     if role == "admin":
         pass
@@ -83,7 +82,6 @@ def list_interviews_calendar(
 
     rows = q.order_by(Interview.interview_date.asc()).all()
 
-    # Gather interviewer names once to avoid repetitive lookups.
     interviewer_ids = sorted({row[0].interviewer_id for row in rows})
     interviewer_map = {
         u.user_id: u.name

@@ -13,13 +13,6 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
-
-
-class UserRegister(BaseModel):
-    """Schema for public registration — role is always forced to candidate."""
-    name: str
-    email: str
-    password: str
     
 
 class UserResponse(UserBase):

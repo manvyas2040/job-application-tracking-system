@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..authentication import (
@@ -12,33 +13,40 @@ from ..authentication import (
 )
 from ..Database import get_db
 from ..Models import User
-from ..schemas import PasswordChangeRequest, TokenRefreshRequest, UserRegister
-from .dependencies import _audit, _current_db_user, _get_user
+from ..schemas import PasswordChangeRequest, TokenRefreshRequest, UserCreate
+from .dependencies import _audit, _current_db_user, _get_user, _normalize_role
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
      
      
 @router.post("/register")
-def register(payload: UserRegister, db: Session = Depends(get_db)):
-    """Register a new user. Role is always set to 'candidate'."""
+def register(payload: UserCreate, db: Session = Depends(get_db)):
+    """Register a new user"""
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Email already exists")
+                                                
+    role = _normalize_role(payload.role)
+
+    if role == "admin":
+        admin_exists = db.query(User).filter(func.lower(User.role) == "admin").first() is not None
+        if admin_exists:
+            raise HTTPException(status_code=403, detail="Admin registration is not allowed. Contact an existing admin.")
 
     user = User(
         name=payload.name,
         email=payload.email,
         password=hash_password(payload.password),
-        role="candidate",
-        status="active",
+        role=role,
+        status="active", 
         is_active=True,
         token_version=1,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
-    _audit(db, user.user_id, f"user_created:{user.user_id}:candidate")
+    _audit(db, user.user_id, f"user_created:{user.user_id}:{role}")
     db.commit()
-    return {"user_id": user.user_id, "role": user.role, "status": user.status}
+    return {"user_id": user.user_id, "status": user.status}
 
 
 @router.post("/login")

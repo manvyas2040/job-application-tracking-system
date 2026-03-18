@@ -24,10 +24,7 @@
         </nav>
 
         <div class="dashboard">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h2 style="margin: 0;">User Management</h2>
-                <button class="btn btn-primary" onclick="openModal('create-user-modal')">+ Create User</button>
-            </div>
+            <h2>User Management</h2>
             <p style="color: var(--secondary); margin-bottom: 20px;">Manage all users in the system</p>
 
             <!-- Filters -->
@@ -59,42 +56,6 @@
             <div id="users-container">
                 <div class="loading"><div class="spinner"></div></div>
             </div>
-        </div>
-    </div>
-
-    <!-- Create User Modal -->
-    <div id="create-user-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Create HR / Interviewer Account</h2>
-                <button class="close-btn" onclick="closeModal('create-user-modal')">&times;</button>
-            </div>
-            <form onsubmit="createUser(event)">
-                <div class="form-group">
-                    <label>Full Name *</label>
-                    <input type="text" id="create-name" placeholder="e.g. Priya Sharma" required>
-                </div>
-                <div class="form-group">
-                    <label>Email *</label>
-                    <input type="email" id="create-email" placeholder="e.g. priya@company.com" required>
-                </div>
-                <div class="form-group">
-                    <label>Password *</label>
-                    <input type="password" id="create-password" placeholder="Min 6 characters" required minlength="6">
-                </div>
-                <div class="form-group">
-                    <label>Role *</label>
-                    <select id="create-role" required>
-                        <option value="hr">HR</option>
-                        <option value="interviewer">Interviewer</option>
-                    </select>
-                </div>
-                <div class="error-message" id="create-user-error"></div>
-                <div style="display: flex; gap: 10px;">
-                    <button type="submit" class="btn btn-primary">Create Account</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('create-user-modal')">Cancel</button>
-                </div>
-            </form>
         </div>
     </div>
 
@@ -207,31 +168,6 @@
                 `;
             } catch (error) {
                 container.innerHTML = `<p style="color:red; text-align:center; padding:40px;">Error: ${error.message}</p>`;
-            }
-        }
-
-        async function createUser(event) {
-            event.preventDefault();
-
-            const name     = document.getElementById('create-name').value.trim();
-            const email    = document.getElementById('create-email').value.trim();
-            const password = document.getElementById('create-password').value;
-            const role     = document.getElementById('create-role').value;
-
-            hideError('create-user-error');
-
-            try {
-                const result = await apiCall('/users', {
-                    method: 'POST',
-                    body: JSON.stringify({ name, email, password, role, status: 'active' })
-                });
-
-                alert(`Account created! User ID: ${result.user_id}, Role: ${result.role}`);
-                closeModal('create-user-modal');
-                event.target.reset();
-                loadUsers();
-            } catch (error) {
-                showError('create-user-error', error.message);
             }
         }
 

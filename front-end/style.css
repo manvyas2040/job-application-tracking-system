@@ -445,110 +445,6 @@ body {
     font-size: 0.9rem;
 }
 
-.modern-dashboard {
-    padding: 24px;
-}
-
-.dashboard-layout {
-    display: grid;
-    grid-template-columns: 1.75fr 1fr;
-    gap: 22px;
-}
-
-.hero-row {
-    margin-bottom: 18px;
-}
-
-.hero-card {
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 35%, #0f766e 100%);
-    color: white;
-    border-radius: 16px;
-    padding: 22px;
-    box-shadow: 0 14px 32px rgba(30, 64, 175, 0.25);
-}
-
-.hero-kicker {
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: 0.75rem;
-    opacity: 0.9;
-    margin-bottom: 10px;
-}
-
-.hero-card h2 {
-    margin-bottom: 8px;
-    font-size: 1.8rem;
-}
-
-.hero-sub {
-    opacity: 0.92;
-    max-width: 52ch;
-}
-
-.quick-actions {
-    margin-top: 26px;
-}
-
-.quick-actions-row {
-    display: flex;
-    gap: 12px;
-    margin-top: 14px;
-    flex-wrap: wrap;
-}
-
-.quick-actions-row .btn {
-    width: auto;
-}
-
-.recent-block {
-    margin-top: 30px;
-}
-
-.dashboard-side {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.calendar-card,
-.upcoming-card {
-    background: #ffffff;
-    border: 2px solid var(--border);
-    border-radius: 14px;
-    padding: 14px;
-}
-
-.calendar-head {
-    margin-bottom: 10px;
-}
-
-.calendar-head h3,
-.upcoming-card h3 {
-    margin: 0;
-}
-
-#dashboard-calendar .fc .fc-toolbar-title {
-    font-size: 1rem;
-}
-
-#dashboard-calendar .fc .fc-button {
-    background: #e2e8f0;
-    border-color: #e2e8f0;
-    color: #334155;
-    text-transform: capitalize;
-}
-
-#dashboard-calendar .fc .fc-button:hover {
-    background: #cbd5e1;
-    border-color: #cbd5e1;
-}
-
-#dashboard-calendar .fc .fc-daygrid-event {
-    border-radius: 6px;
-    font-size: 0.75rem;
-    padding: 1px 4px;
-}
-
 .upcoming-list {
     display: grid;
     gap: 10px;
@@ -560,8 +456,8 @@ body {
     grid-template-columns: 34px 1fr auto;
     gap: 10px;
     align-items: center;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(186, 230, 253, 0.75);
     border-radius: 10px;
     padding: 9px;
 }
@@ -570,7 +466,7 @@ body {
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #3b82f6 0%, #22d3ee 100%);
+    background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
     color: white;
     display: flex;
     align-items: center;
@@ -916,43 +812,6 @@ tr:hover {
 
     .stats-grid {
         grid-template-columns: 1fr;
-    }
-
-    .dashboard-shell {
-        grid-template-columns: 1fr;
-    }
-
-    .shell-hero {
-        padding: 14px;
-    }
-
-    .kpi-row {
-        grid-template-columns: 1fr;
-    }
-
-    .analytics-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .dashboard-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .modern-dashboard {
-        padding: 16px;
-    }
-
-    .hero-card h2 {
-        font-size: 1.4rem;
-    }
-
-    .upcoming-item {
-        grid-template-columns: 34px 1fr;
-    }
-
-    .upcoming-time {
-        grid-column: 2;
-        margin-top: 4px;
     }
 
     .jobs-grid {
