@@ -232,6 +232,69 @@ def get_my_interviews(
     return result
 
 
+@router.get("/my/notifications")
+def get_my_interview_notifications(
+    current=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get interview-only notifications for the current interviewer."""
+    user = _current_db_user(current, db)
+    require_roles("interviewer")(current)
+
+    _auto_complete_overdue(db)
+
+    rows = (
+        db.query(Interview, Application, Candidate, User, Job)
+        .join(Application, Interview.application_id == Application.application_id)
+        .join(Candidate, Application.candidate_id == Candidate.candidate_id)
+        .join(User, Candidate.user_id == User.user_id)
+        .join(Job, Application.job_id == Job.job_id)
+        .filter(Interview.interviewer_id == user.user_id)
+        .order_by(Interview.interview_date.asc())
+        .all()
+    )
+
+    now = datetime.utcnow()
+    notifications = []
+    for interview, app_row, _candidate_row, candidate_user, job in rows:
+        if interview.interview_status == "cancelled":
+            continue
+
+        if interview.interview_status in ["scheduled", "rescheduled"] and interview.interview_date >= now:
+            notification_type = "info"
+            status_text = "rescheduled" if interview.interview_status == "rescheduled" else "scheduled"
+            message = (
+                f"Interview {status_text}: {candidate_user.name} for {job.job_title} on "
+                f"{interview.interview_date.strftime('%B %d, %Y at %I:%M %p')}"
+            )
+        elif interview.interview_status == "awaiting_feedback":
+            notification_type = "action_required"
+            message = (
+                f"Feedback pending: Submit feedback for {candidate_user.name} "
+                f"({job.job_title})"
+            )
+        else:
+            notification_type = "info"
+            message = (
+                f"Interview update: {candidate_user.name} ({job.job_title}) - "
+                f"{interview.interview_status.replace('_', ' ').title()}"
+            )
+
+        notifications.append(
+            {
+                "notification_id": interview.interview_id,
+                "notification_type": notification_type,
+                "message": message,
+                "related_application_id": app_row.application_id,
+                "interview_id": interview.interview_id,
+                "is_read": False,
+                "created_at": interview.created_at,
+            }
+        )
+
+    return notifications
+
+
 @router.get("/candidate")
 def get_candidate_interviews(
     current=Depends(get_current_user),
@@ -313,15 +376,23 @@ def create_interview(
     current=Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Schedule a new interview (HR/Admin)"""
-    _current_db_user(current, db)
+    """Schedule a new interview (HR/Admin) - validates all data, then creates interview & sends notifications atomically"""
+    user = _current_db_user(current, db)
     require_roles("HR", "admin")(current)
     current_time = datetime.utcnow()
 
+    # ============================================
+    # VALIDATION PHASE - Check ALL data FIRST
+    # ============================================
+    
     # 1. Application must exist
     app_row = db.query(Application).filter(Application.application_id == payload.application_id).first()
     if not app_row:
         raise HTTPException(status_code=404, detail="Application not found")
+
+    # 1a. Application must be shortlisted
+    if app_row.application_status != "shortlisted":
+        raise HTTPException(status_code=400, detail="Interviews can only be scheduled for shortlisted candidates")
 
     # 2. Interview must be in the future
     if payload.interview_date <= current_time:
@@ -338,9 +409,9 @@ def create_interview(
     if not interviewer:
         raise HTTPException(status_code=404, detail="Interviewer not found")
 
-    # 5. Interviewer must have role 'interviewer'
+    # 5. Interviewer must have role 'interviewer' (CRITICAL VALIDATION)
     if interviewer.role != "interviewer":
-        raise HTTPException(status_code=400, detail="Selected user does not have the interviewer role")
+        raise HTTPException(status_code=400, detail="Selected user must have 'interviewer' role")
 
     # 6. Interviewer cannot be the candidate who applied
     candidate = db.query(Candidate).filter(Candidate.candidate_id == app_row.candidate_id).first()
@@ -381,6 +452,11 @@ def create_interview(
     if candidate_conflict:
         raise HTTPException(status_code=400, detail="Candidate already has an interview scheduled at this time")
 
+    # ============================================
+    # CREATION PHASE - All validations passed
+    # ============================================
+    
+    # Create the interview
     row = Interview(
         application_id=payload.application_id,
         interview_date=payload.interview_date,
@@ -388,14 +464,41 @@ def create_interview(
         interviewer_id=payload.interviewer_id,
         interview_status="scheduled",
     )
+    
+    # Update application status
     app_row.application_status = "interview_scheduled"
     db.add(row)
     
-    _notify(db, app_row.candidate_id, "Interview scheduled", "info", app_row.application_id)
+    # ============================================
+    # NOTIFICATION PHASE - Add all before commit
+    # ============================================
+    
+    # Get candidate user info for comprehensive notification
+    candidate_user = db.query(User).filter(User.user_id == candidate.user_id).first() if candidate else None
+    interview_date_str = payload.interview_date.strftime("%B %d, %Y at %I:%M %p")
+    
+    # Notify candidate about interview scheduling
+    _notify(
+        db, 
+        app_row.candidate_id, 
+        f"Interview scheduled for {job.job_title} role on {interview_date_str} with {interviewer.name}",
+        "info", 
+        app_row.application_id
+    )
+    
+    # ============================================
+    # AUDIT PHASE - Log the action
+    # ============================================
+    
+    _audit(db, current["user_id"], f"interview_scheduled:{row.interview_id}:app_{payload.application_id}:interviewer_{payload.interviewer_id}")
+    
+    # ============================================
+    # ATOMIC COMMIT - Single database transaction
+    # ============================================
+    
     db.commit()
     db.refresh(row)
-    _audit(db, current["user_id"], f"interview_scheduled:{row.interview_id}:app_{payload.application_id}")
-    db.commit()
+    
     return row
 
 
@@ -434,7 +537,7 @@ def delete_interview(
     current=Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete/cancel an interview (HR/Admin)"""
+    """Delete/cancel an interview (HR/Admin) - validates permissions and applies atomic transaction"""
     user = _current_db_user(current, db)
     require_roles("hr", "admin")(current)
     
@@ -461,11 +564,21 @@ def delete_interview(
     if app_row.application_status == "interview_scheduled":
         app_row.application_status = "shortlisted"
     
-    # Notify candidate about interview deletion
-    _notify(db, app_row.candidate_id, "Your scheduled interview has been cancelled", "warning", app_row.application_id)
+    # Notify candidate about interview cancellation (atomic with delete)
+    _notify(
+        db, 
+        app_row.candidate_id, 
+        f"Your scheduled interview for {job.job_title} has been cancelled. Please contact HR for more details.",
+        "warning", 
+        app_row.application_id
+    )
     
-    _audit(db, current["user_id"], f"interview_cancelled:{interview_id}")
+    # Log the action
+    _audit(db, current["user_id"], f"interview_cancelled:{interview_id}:app_{app_row.application_id}")
+    
+    # Single atomic commit
     db.commit()
+    
     return {"message": "Interview deleted successfully"}
 
 
@@ -541,18 +654,21 @@ def reschedule_interview(
     if payload.interview_type:
         row.interview_type = payload.interview_type
     
-    db.commit()
+    # Notify candidate about reschedule (atomic with DB commit)
+    interviewer = db.query(User).filter(User.user_id == row.interviewer_id).first()
+    interviewer_name = interviewer.name if interviewer else "your interviewer"
     
-    # Notify candidate about reschedule
     _notify(
         db,
         app_row.candidate_id,
-        f"Your interview has been rescheduled to {row.interview_date.strftime('%Y-%m-%d %H:%M')}",
+        f"Your interview for {app_row.job_id} has been rescheduled to {row.interview_date.strftime('%B %d, %Y at %I:%M %p')} with {interviewer_name}",
         "info",
         app_row.application_id
     )
     
     _audit(db, current["user_id"], f"interview_rescheduled:{interview_id}")
+    
+    # Single atomic commit
     db.commit()
     return row
 

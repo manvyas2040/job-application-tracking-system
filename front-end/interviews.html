@@ -27,9 +27,6 @@
         <div class="dashboard">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2>Interview Management</h2>
-                <button id="schedule-btn" class="btn btn-success" onclick="openModal('schedule-interview-modal')" style="display:none;">
-                    + Schedule Interview
-                </button>
             </div>
 
             <!-- HR View: Shortlisted Applications -->
@@ -70,7 +67,7 @@
             <form onsubmit="scheduleInterview(event)">
                 <div class="form-group">
                     <label>Application ID *</label>
-                    <input type="number" id="application-id" required placeholder="Enter application ID">
+                    <input type="number" id="application-id" required placeholder="Enter application ID" readonly style="background-color: #f0f0f0;">
                 </div>
                 <div class="form-group">
                     <label>Interview Date & Time *</label>
@@ -86,9 +83,11 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Interviewer ID *</label>
-                    <input type="number" id="interviewer-id" required placeholder="Enter interviewer user ID">
-                    <small style="color: var(--secondary);">Get this from Users page</small>
+                    <label>Interviewer *</label>
+                    <select id="interviewer-id" required>
+                        <option value="">-- Loading interviewers --</option>
+                    </select>
+                    <small style="color: var(--secondary);">Select a valid interviewer from the list</small>
                 </div>
                 <div class="error-message" id="schedule-error"></div>
                 <div style="display: flex; gap: 10px;">
@@ -199,7 +198,6 @@
 
         if (isHR) {
             document.getElementById('hr-view').style.display = 'block';
-            document.getElementById('schedule-btn').style.display = 'block';
             loadShortlistedApplications();
         }
 
@@ -374,10 +372,33 @@
             }
         }
 
-        function openScheduleModal(appId) {
+        // Schedule Interview Modal - populate from table
+        async function openScheduleModal(appId) {
             document.getElementById('application-id').value = appId;
             document.getElementById('interview-date').min = new Date().toISOString().slice(0, 16);
+            document.getElementById('interview-date').value = '';
+            document.getElementById('interview-type').value = 'technical';
+            await loadInterviewers();
             openModal('schedule-interview-modal');
+        }
+
+        async function loadInterviewers() {
+            const select = document.getElementById('interviewer-id');
+            try {
+                const data = await apiCall('/interviews/interviewers');
+                select.innerHTML = '<option value="">-- Select interviewer --</option>';
+                data.forEach(interviewer => {
+                    const option = document.createElement('option');
+                    option.value = interviewer.user_id;
+                    option.textContent = interviewer.name;
+                    select.appendChild(option);
+                });
+                if (data.length === 0) {
+                    select.innerHTML = '<option value="">No interviewers available</option>';
+                }
+            } catch (error) {
+                select.innerHTML = `<option value="">Error loading interviewers: ${error.message}</option>`;
+            }
         }
 
         async function scheduleInterview(event) {
@@ -386,9 +407,15 @@
             const applicationId = parseInt(document.getElementById('application-id').value);
             const interviewDate = document.getElementById('interview-date').value;
             const interviewType = document.getElementById('interview-type').value;
-            const interviewerId = parseInt(document.getElementById('interviewer-id').value);
+            const interviewerId = document.getElementById('interviewer-id').value;
 
             hideError('schedule-error');
+
+            // Validate interviewer selection
+            if (!interviewerId) {
+                showError('schedule-error', 'Please select a valid interviewer');
+                return;
+            }
 
             try {
                 await apiCall('/interviews', {
@@ -397,11 +424,11 @@
                         application_id: applicationId,
                         interview_date: interviewDate,
                         interview_type: interviewType,
-                        interviewer_id: interviewerId
+                        interviewer_id: parseInt(interviewerId)
                     })
                 });
 
-                alert('Interview scheduled successfully!');
+                alert('Interview scheduled successfully! Notifications sent to candidate and interviewer.');
                 closeModal('schedule-interview-modal');
                 loadShortlistedApplications();
                 loadAllInterviews();
