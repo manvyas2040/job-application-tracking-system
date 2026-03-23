@@ -159,66 +159,6 @@ npm run dev
 
 **Frontend runs on**: `http://localhost:3000`
 
----
-
-## 🔐 Test Credentials
-
-Use these accounts to test the application:
-
-### **Admin Account**
-```
-Email: admin@company.com
-Password: Admin@123
-Role: Administrator
-```
-
-### **HR Accounts**
-```
-Email: hr1@company.com
-Password: Hr@12345
-Role: HR Manager
-
-Email: hr2@company.com
-Password: Hr@12345
-Role: HR Manager
-```
-
-### **Interviewer Accounts**
-```
-Email: interviewer1@company.com
-Password: Inter@123
-Role: Interviewer
-
-Email: interviewer2@company.com
-Password: Inter@123
-Role: Interviewer
-```
-
-### **Candidate Accounts**
-```
-Email: rohan@gmail.com
-Password: Cand@1234
-Role: Candidate
-
-Email: sneha@gmail.com
-Password: Cand@1234
-Role: Candidate
-
-Email: vikram@gmail.com
-Password: Cand@1234
-Role: Candidate
-
-Email: pooja@gmail.com
-Password: Cand@1234
-Role: Candidate
-
-Email: arjun@gmail.com
-Password: Cand@1234
-Role: Candidate
-```
-
----
-
 ## 📁 Project Structure
 
 ```
@@ -473,16 +413,7 @@ python -m py_compile backend/*.py
 
 ---
 
-## 📝 Environment Variables
 
-### **Backend** (`.env`)
-```env
-DATABASE_URL=sqlite:///./test.db
-SECRET_KEY=your-secret-key-here
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=7
-```
 
 ### **Frontend** (`.env.local`)
 ```env
