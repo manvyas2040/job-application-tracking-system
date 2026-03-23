@@ -21,22 +21,22 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
      
 @router.post("/register")
 def register(payload: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user"""
+    """Register a new user - ONLY CANDIDATE role is allowed"""
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Email already exists")
-                                                
-    role = _normalize_role(payload.role)
-
-    if role == "admin":
-        admin_exists = db.query(User).filter(func.lower(User.role) == "admin").first() is not None
-        if admin_exists:
-            raise HTTPException(status_code=403, detail="Admin registration is not allowed. Contact an existing admin.")
-
+    
+    # Only candidates can self-register
+    if payload.role.lower() != "candidate":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only candidates can register. Admin, HR, and Interviewer accounts must be created by an administrator."
+        )
+    
     user = User(
         name=payload.name,
         email=payload.email,
         password=hash_password(payload.password),
-        role=role,
+        role="candidate",
         status="active", 
         is_active=True,
         token_version=1,
@@ -44,7 +44,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    _audit(db, user.user_id, f"user_created:{user.user_id}:{role}")
+    _audit(db, user.user_id, f"user_created:{user.user_id}:candidate")
     db.commit()
     return {"user_id": user.user_id, "status": user.status}
 

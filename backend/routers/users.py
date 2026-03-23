@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 
-from ..authentication import get_current_user
+from ..authentication import get_current_user, hash_password
 from ..authorize import enforce_self_or_admin, require_roles
 from ..Database import get_db
 from ..Models import User
-from ..schemas import RoleChangeRequest, UserUpdate
+from ..schemas import RoleChangeRequest, UserUpdate, UserCreate
 from .dependencies import _audit, _current_db_user, _get_user, _normalize_role
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -36,6 +36,51 @@ def list_users(
     total = q.count()
     items = q.offset((page - 1) * page_size).limit(page_size).all()
     return {"total": total, "items": items}
+
+
+@router.post("/create")
+def create_user(
+    payload: UserCreate,
+    current=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create a new user (admin only) - can be any role: admin, hr, interviewer, candidate"""
+    require_roles("admin")(current)
+    admin_user = _current_db_user(current, db)
+    
+    # Check if email already exists
+    if db.query(User).filter(User.email == payload.email).first():
+        raise HTTPException(status_code=400, detail="Email already exists")
+    
+    # Normalize and validate role
+    role = _normalize_role(payload.role)
+    
+    # Create the new user
+    user = User(
+        name=payload.name,
+        email=payload.email,
+        password=hash_password(payload.password),
+        role=role,
+        status="active",
+        is_active=True,
+        token_version=1,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    # Audit log
+    _audit(db, admin_user.user_id, f"user_created_by_admin:{user.user_id}:{role}")
+    db.commit()
+    
+    return {
+        "user_id": user.user_id,
+        "email": user.email,
+        "name": user.name,
+        "role": user.role,
+        "status": user.status,
+        "message": f"{role.upper()} user created successfully"
+    }
 
 
 @router.patch("/{user_id}")
