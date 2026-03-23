@@ -458,3 +458,71 @@ async function loadNotificationCount() {
         }
     }
 }
+
+// ============================================
+// PDF Management Utility Functions
+// ============================================
+
+// Download a PDF file
+async function downloadPDFFile(url, filename) {
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to download file');
+        }
+
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename || 'download.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(downloadUrl);
+        document.body.removeChild(a);
+    } catch (error) {
+        alert('Error downloading file: ' + error.message);
+    }
+}
+
+// Open PDF in viewer
+function openPDFInViewer(url) {
+    try {
+        window.open(url, '_blank');
+    } catch (error) {
+        alert('Error opening PDF: ' + error.message);
+    }
+}
+
+// Validate PDF file
+function validatePDFFile(file) {
+    const errors = [];
+    
+    if (!file.type.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf')) {
+        errors.push('File must be a PDF');
+    }
+    
+    if (file.size > 10 * 1024 * 1024) {
+        errors.push('File size must be less than 10MB');
+    }
+    
+    return {
+        valid: errors.length === 0,
+        errors: errors
+    };
+}
+
+// Format file size for display
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+

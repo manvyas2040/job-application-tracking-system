@@ -150,6 +150,40 @@
         </div>
     </div>
 
+    <!-- Document Upload Modal -->
+    <div id="document-upload-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Upload Supporting Document</h2>
+                <button class="close-btn" onclick="closeModal('document-upload-modal')">&times;</button>
+            </div>
+            <form onsubmit="uploadApplicationDocument(event)">
+                <input type="hidden" id="document-app-id">
+                <div class="form-group">
+                    <label>PDF Document *</label>
+                    <div class="upload-zone" id="doc-dropZone" style="cursor: pointer;">
+                        <input type="file" id="docInput" accept=".pdf" style="display:none;">
+                        <div class="upload-content">
+                            <div class="upload-icon">📁</div>
+                            <p class="upload-text">Drag your PDF here or click to upload</p>
+                            <p class="upload-hint">Maximum file size: 10MB</p>
+                        </div>
+                        <div id="doc-upload-progress" class="upload-progress" style="display:none;">
+                            <div class="progress-bar"></div>
+                            <p>Uploading...</p>
+                        </div>
+                    </div>
+                    <div id="doc-file-name" style="margin-top: 10px; color: var(--success);"></div>
+                </div>
+                <div class="error-message" id="doc-upload-error"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary" id="doc-submit-btn">Upload Document</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('document-upload-modal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="app.js"></script>
     <script>
         requireAuth();
@@ -306,7 +340,26 @@
                                     </div>
                                     <div>
                                         <strong>Resume:</strong> ${escapeHtml(candidateData.profile.resume_path || 'Not provided')}
+                                        ${candidateData.profile.resume_path ? `
+                                            <button class="btn-icon" onclick="downloadCandidateResume('${candidateData.profile.resume_path}')" style="margin-left: 10px;" title="Download Resume">
+                                                ⬇️
+                                            </button>
+                                        ` : ''}
                                     </div>
+                                </div>
+                                <!-- Documents Section -->
+                                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+                                    <strong>Supporting Documents:</strong>
+                                    <div id="documents-list-${app.application_id}" style="margin-top: 10px;">
+                                        <p style="color: var(--secondary);">Loading documents...</p>
+                                    </div>
+                                    ${(user.role === 'hr' || user.role === 'admin' || user.role === 'interviewer') ? `
+                                        <div style="margin-top: 15px;">
+                                            <button class="btn btn-sm btn-primary" onclick="openDocumentUploadModal(${app.application_id})">
+                                                ➕ Add Document
+                                            </button>
+                                        </div>
+                                    ` : ''}
                                 </div>
                             </div>
                         ` : ''}
@@ -544,6 +597,205 @@
         }
 
         loadApplicationDetail();
+
+        // Document Handling Functions
+        function openDocumentUploadModal(appId) {
+            document.getElementById('document-app-id').value = appId;
+            document.getElementById('docInput').value = '';
+            document.getElementById('doc-file-name').textContent = '';
+            document.getElementById('doc-upload-error').textContent = '';
+            setupDocumentUploadHandlers();
+            openModal('document-upload-modal');
+        }
+
+        function setupDocumentUploadHandlers() {
+            const dropZone = document.getElementById('doc-dropZone');
+            const fileInput = document.getElementById('docInput');
+
+            if (!dropZone || !fileInput) return;
+
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('drag-over');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    showSelectedFile(files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    showSelectedFile(e.target.files[0]);
+                }
+            });
+        }
+
+        function showSelectedFile(file) {
+            const fileNameDiv = document.getElementById('doc-file-name');
+            fileNameDiv.textContent = `✅ Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`;
+        }
+
+        async function uploadApplicationDocument(event) {
+            event.preventDefault();
+
+            const appId = document.getElementById('document-app-id').value;
+            const fileInput = document.getElementById('docInput');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                showError('doc-upload-error', 'Please select a file');
+                return;
+            }
+
+            if (file.type !== 'application/pdf') {
+                showError('doc-upload-error', 'Only PDF files are allowed');
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                showError('doc-upload-error', 'File too large (max 10MB)');
+                return;
+            }
+
+            document.getElementById('doc-upload-progress').style.display = 'block';
+            document.getElementById('doc-submit-btn').disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`${API_URL}/files/upload/document/${appId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Upload failed');
+                }
+
+                setTimeout(() => {
+                    document.getElementById('doc-upload-progress').style.display = 'none';
+                    document.getElementById('doc-submit-btn').disabled = false;
+                    alert('Document uploaded successfully!');
+                    closeModal('document-upload-modal');
+                    loadApplicationDetail();
+                }, 500);
+
+            } catch (error) {
+                document.getElementById('doc-upload-progress').style.display = 'none';
+                document.getElementById('doc-submit-btn').disabled = false;
+                showError('doc-upload-error', error.message);
+            }
+        }
+
+        async function downloadCandidateResume(filename) {
+            try {
+                const response = await fetch(`${API_URL}/files/resume/${filename}`, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to download resume');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } catch (error) {
+                alert('Error downloading resume: ' + error.message);
+            }
+        }
+
+        async function loadDocumentsForApplication(appId) {
+            try {
+                const response = await apiCall(`/files/application/${appId}/documents`);
+                const listDiv = document.getElementById(`documents-list-${appId}`);
+                
+                if (!listDiv) return;
+
+                if (response.documents && response.documents.length > 0) {
+                    listDiv.innerHTML = response.documents.map(doc => `
+                        <div class="document-item" style="display: flex; align-items: center; justify-content: space-between; padding: 10px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.2em;">📄</span>
+                                <div>
+                                    <p style="margin: 0; font-weight: 500;">${escapeHtml(doc.filename)}</p>
+                                    <p style="margin: 0; font-size: 0.85em; color: var(--secondary);">${doc.size_mb.toFixed(2)}MB • ${new Date(doc.uploaded_at).toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                            <button class="btn-icon" onclick="downloadDocument('${doc.filename}')" title="Download">
+                                ⬇️
+                            </button>
+                        </div>
+                    `).join('');
+                } else {
+                    listDiv.innerHTML = '<p style="color: var(--secondary);">No documents uploaded yet</p>';
+                }
+            } catch (error) {
+                const listDiv = document.getElementById(`documents-list-${appId}`);
+                if (listDiv) {
+                    listDiv.innerHTML = '<p style="color: red;">Error loading documents</p>';
+                }
+            }
+        }
+
+        async function downloadDocument(filename) {
+            try {
+                const response = await fetch(`${API_URL}/files/interview/${filename}`, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to download document');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } catch (error) {
+                alert('Error downloading document: ' + error.message);
+            }
+        }
+
+        // Load documents after application detail loads
+        const originalLoadApplicationDetail = window.loadApplicationDetail;
+        window.loadApplicationDetail = async function() {
+            await originalLoadApplicationDetail();
+            if (applicationId) {
+                loadDocumentsForApplication(applicationId);
+            }
+        };
     </script>
 </body>
 </html>

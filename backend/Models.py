@@ -66,6 +66,7 @@ class Application(Base):
     application_status = Column(String, default="applied")
     applied_date = Column(DateTime, default=datetime.utcnow)
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    supporting_documents = Column(Text, nullable=True)  # JSON array of document filenames
 
     candidate = relationship("Candidate", back_populates="applications")
     job = relationship("Job", back_populates="applications")

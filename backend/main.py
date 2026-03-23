@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .Database import Base, engine
-from .routers import auth, users, candidates, jobs, applications, interviews, notifications, audit
+from .routers import auth, users, candidates, jobs, applications, interviews, notifications, audit, pdfs
 
 # Create FastAPI app
 app = FastAPI(title="Job Application Tracking System")
@@ -37,6 +37,7 @@ app.include_router(applications.router)
 app.include_router(interviews.router)
 app.include_router(notifications.router)
 app.include_router(audit.router)
+app.include_router(pdfs.router)
 
 
 @app.get("/")

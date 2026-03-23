@@ -82,7 +82,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid subject") from exc
 
     return {
-        "user_id": user_id,
+        "user_id": user_id, 
         "role": payload.get("role"),
         "token_version": payload.get("token_version", 0),
     }

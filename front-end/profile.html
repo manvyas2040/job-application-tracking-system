@@ -126,16 +126,20 @@
                                     <label>Years of Experience</label>
                                     <input type="number" id="edit-experience" value="${parseInt(profile.experience_years)}" required min="0" max="50">
                                 </div>
-                                <div class="form-group">
-                                    <label>Resume Path</label>
-                                    <input type="text" id="edit-resume" value="${escapeHtml(profile.resume_path || '')}">
-                                </div>
-                                <div class="error-message" id="edit-error"></div>
                                 <div style="display:flex; gap:10px;">
                                     <button type="submit" class="btn btn-success">Save Changes</button>
                                     <button type="button" class="btn btn-secondary" onclick="cancelEdit()">Cancel</button>
                                 </div>
                             </form>
+                        </div>
+
+                        <!-- Resume Upload Section -->
+                        <hr style="margin: 30px 0; border: none; border-top: 2px solid var(--border);">
+                        <div style="margin-top: 30px;">
+                            <h3>📄 Resume Management</h3>
+                            <div class="resume-upload-container" id="resume-section">
+                                <!-- Content loaded by JavaScript -->
+                            </div>
                         </div>
                     </div>
                 `;
@@ -143,12 +147,66 @@
                 // Mark profile as complete
                 const updatedUser = { ...user, profile_complete: true };
                 setUser(updatedUser);
+                
+                // Load resume section
+                loadResumeSection(profile.resume_path);
 
             } catch (error) {
                 container.innerHTML = `<p style="color:red; text-align:center; padding:40px;">Error: ${error.message}</p>`;
             }
         }
 
+        function loadResumeSection(currentResume) {
+            const section = document.getElementById('resume-section');
+            
+            if (currentResume) {
+                section.innerHTML = `
+                    <div class="resume-card">
+                        <div class="resume-info">
+                            <div class="resume-icon">📄</div>
+                            <div>
+                                <p class="resume-name">${escapeHtml(currentResume)}</p>
+                                <p class="resume-meta">Current Resume (PDF)</p>
+                            </div>
+                        </div>
+                        <div class="resume-actions">
+                            <button class="btn-icon" onclick="downloadResume('${currentResume}')" title="Download">
+                                ⬇️
+                            </button>
+                            <button class="btn-icon btn-danger-icon" onclick="deleteAndReuploadResume()" title="Replace">
+                                🔄
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                section.innerHTML = `
+                    <div class="empty-state">
+                        <p>No resume uploaded yet</p>
+                    </div>
+                `;
+            }
+            
+            // Add upload form
+            section.innerHTML += `
+                <div class="upload-zone" id="dropZone">
+                    <input type="file" id="resumeInput" accept=".pdf" style="display:none;">
+                    <div class="upload-content">
+                        <div class="upload-icon">📁</div>
+                        <p class="upload-text">Drag your PDF resume here or click to upload</p>
+                        <p class="upload-hint">Maximum file size: 10MB</p>
+                    </div>
+                    <div id="upload-progress" class="upload-progress" style="display:none;">
+                        <div class="progress-bar"></div>
+                        <p>Uploading...</p>
+                    </div>
+                    <div id="upload-status" class="upload-status"></div>
+                </div>
+            `;
+            
+            setupResumeUploadHandlers();
+            
+            }
         function openEditMode() {
             document.getElementById('view-mode').style.display = 'none';
             document.getElementById('edit-mode').style.display = 'block';
@@ -166,7 +224,6 @@
             const phone = document.getElementById('edit-phone').value;
             const skills = document.getElementById('edit-skills').value;
             const experience = parseInt(document.getElementById('edit-experience').value);
-            const resume = document.getElementById('edit-resume').value;
 
             hideError('edit-error');
 
@@ -176,8 +233,7 @@
                     body: JSON.stringify({
                         phone,
                         skills,
-                        experience_years: experience,
-                        resume_path: resume || null
+                        experience_years: experience
                     })
                 });
 
@@ -186,6 +242,121 @@
             } catch (error) {
                 showError('edit-error', error.message);
             }
+        }
+
+        function setupResumeUploadHandlers() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('resumeInput');
+
+            if (!dropZone || !fileInput) return;
+
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('drag-over');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    uploadResume(files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    uploadResume(e.target.files[0]);
+                }
+            });
+        }
+
+        async function uploadResume(file) {
+            const dropZone = document.getElementById('dropZone');
+            const statusDiv = document.getElementById('upload-status');
+            const progressDiv = document.getElementById('upload-progress');
+
+            if (!file.type === 'application/pdf') {
+                statusDiv.innerHTML = `<div class="error-message">❌ Only PDF files are allowed</div>`;
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                statusDiv.innerHTML = `<div class="error-message">❌ File too large (max 10MB)</div>`;
+                return;
+            }
+
+            progressDiv.style.display = 'block';
+            statusDiv.innerHTML = '';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`${API_URL}/files/upload/resume`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Upload failed');
+                }
+
+                const data = await response.json();
+                progressDiv.style.display = 'none';
+                statusDiv.innerHTML = `<div class="success-message">✅ Resume uploaded successfully!</div>`;
+                
+                setTimeout(() => {
+                    loadProfile();
+                }, 1500);
+
+            } catch (error) {
+                progressDiv.style.display = 'none';
+                statusDiv.innerHTML = `<div class="error-message">❌ ${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        async function downloadResume(filename) {
+            try {
+                const response = await fetch(`${API_URL}/files/resume/${filename}`, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to download resume');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } catch (error) {
+                alert('Error downloading resume: ' + error.message);
+            }
+        }
+
+        async function deleteAndReuploadResume() {
+            if (!confirm('Are you sure you want to replace your current resume?')) {
+                return;
+            }
+            document.getElementById('resumeInput').click();
         }
 
         loadProfile();

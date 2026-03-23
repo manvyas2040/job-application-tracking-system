@@ -249,3 +249,33 @@ class InterviewDetailResponse(InterviewResponse):
 
 class ApplicationWithInterviewsResponse(ApplicationDetailResponse):
     interviews: List[InterviewDetailResponse] = []
+
+
+# PDF-Related Schemas
+class PDFUploadResponse(BaseModel):
+    filename: str
+    url: str
+    size_mb: float
+    uploaded_at: datetime
+
+
+class PDFDocumentInfo(BaseModel):
+    filename: str
+    url: str
+    size_mb: float
+    uploaded_at: datetime
+    document_type: str  # 'resume', 'interview', 'feedback'
+
+
+class PDFDocumentListResponse(BaseModel):
+    documents: List[PDFDocumentInfo]
+    total_count: int
+
+
+class ResumUploadRequest(BaseModel):
+    candidate_id: Optional[int] = None
+
+
+class DocumentUploadRequest(BaseModel):
+    application_id: int
+    document_type: str = "supporting"  # resume, supporting, feedback
