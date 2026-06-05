@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from ..Models import User, AuditLog, CandidateNotification
+from Models import User, AuditLog, CandidateNotification
 
 
 JOB_TRANSITIONS = {

@@ -3,11 +3,11 @@ from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from ..authentication import get_current_user
-from ..authorize import enforce_owner_or_admin, require_roles
-from ..Database import get_db
-from ..Models import Application, Candidate, Interview, InterviewFeedback, Job, User
-from ..schemas import InterviewCreate, InterviewFeedbackCreate, InterviewUpdate
+from authentication import get_current_user
+from authorize import enforce_owner_or_admin, require_roles
+from Database import get_db
+from Models import Application, Candidate, Interview, InterviewFeedback, Job, User
+from schemas import InterviewCreate, InterviewFeedbackCreate, InterviewUpdate
 from .dependencies import APP_TRANSITIONS, INTERVIEW_TRANSITIONS, _audit, _current_db_user, _notify
 
 INTERVIEW_DURATION = timedelta(hours=1)

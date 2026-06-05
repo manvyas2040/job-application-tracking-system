@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..authentication import get_current_user
-from ..authorize import enforce_owner_or_admin, require_roles
-from ..Database import get_db
-from ..Models import Application, Candidate, Interview, Job
-from ..schemas import ApplicationCreate, ApplicationUpdate, BulkStatusUpdate
+from authentication import get_current_user
+from authorize import enforce_owner_or_admin, require_roles
+from Database import get_db
+from Models import Application, Candidate, Interview, Job
+from schemas import ApplicationCreate, ApplicationUpdate, BulkStatusUpdate
 from .dependencies import APP_TRANSITIONS, _audit, _current_db_user, _notify
 
 router = APIRouter(prefix="/applications", tags=["Applications"])

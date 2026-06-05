@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..authentication import get_current_user
-from ..authorize import require_roles
-from ..Database import get_db
-from ..Models import Application, Candidate, Interview, User
-from ..schemas import CandidateUpdate
+from authentication import get_current_user
+from authorize import require_roles
+from Database import get_db
+from Models import Application, Candidate, Interview, User
+from schemas import CandidateUpdate
 from .dependencies import _current_db_user
 from .interviews import _auto_complete_overdue
 

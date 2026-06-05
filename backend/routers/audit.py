@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from ..authentication import get_current_user
-from ..authorize import require_roles
-from ..Database import get_db
-from ..Models import AuditLog
+from authentication import get_current_user
+from authorize import require_roles
+from Database import get_db
+from Models import AuditLog
 from .dependencies import _current_db_user
 
 router = APIRouter(prefix="/audit-logs", tags=["Audit"])

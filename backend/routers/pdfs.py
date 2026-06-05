@@ -8,11 +8,11 @@ from sqlalchemy.orm import Session
 import json
 from datetime import datetime
 
-from ..Database import get_db
-from ..authentication import get_current_user
-from ..Models import Candidate, Application , User
-from ..schemas import PDFUploadResponse, PDFDocumentInfo, PDFDocumentListResponse
-from ..file_utils import (
+from Database import get_db
+from authentication import get_current_user
+from Models import Candidate, Application , User
+from schemas import PDFUploadResponse, PDFDocumentInfo, PDFDocumentListResponse
+from file_utils import (
     save_resume_pdf,
     save_interview_document,
     get_resume_file_path,
