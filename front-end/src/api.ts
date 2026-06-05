@@ -3,7 +3,7 @@
  * Ported from the original app.js
  */
 
-export const API_URL = 'job-application-tracking-system-production.up.railway.app' ;
+export const API_URL = "https://job-application-tracking-system-production.up.railway.app" ;
 
 export interface User {
   user_id: string;
