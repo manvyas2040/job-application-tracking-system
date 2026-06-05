@@ -55,8 +55,8 @@ export default function Navbar({ user }: { user: User }) {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-8">
             <Link to="/dashboard" className="text-2xl font-bold text-blue-600 flex items-center gap-2">
-              <span className="bg-blue-600 text-white p-1 rounded-lg">🎯</span>
-              <span className="hidden sm:inline">JATS</span>
+              <span className="bg-blue-600 text-white p-1 rounded-lg">💻</span>
+              <span className="hidden sm:inline">Nexora Technologies</span>
             </Link>
             
             <div className="hidden md:flex items-center gap-1">

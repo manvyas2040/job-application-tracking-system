@@ -25,7 +25,7 @@ JATS is a comprehensive **Job Application Tracking System** designed to streamli
 ---
 
 ## ✨ Key Features
-
+    
 ### 🎯 **For Candidates**
 - 📋 **Apply for Jobs**: View and apply to open positions
 - 📱 **Profile Management**: Create and maintain candidate profile with resume
@@ -68,7 +68,7 @@ JATS is a comprehensive **Job Application Tracking System** designed to streamli
 ### **Backend**
 - **Framework**: FastAPI (Python 3.9+)
 - **ORM**: SQLAlchemy
-- **Database**: SQLite / PostgreSQL
+- **Database**:  PostgreSQL
 - **Authentication**: JWT + Refresh Tokens
 - **Validation**: Pydantic
 
