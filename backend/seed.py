@@ -1,5 +1,5 @@
 from Database import SessionLocal
-from Models import User, CandidateProfile, Job
+from Models import User, Candidate, Job
 from authentication import hash_password
 
 # ─── Data ───────────────────────────────────────────────────
@@ -57,14 +57,14 @@ for email, profile in PROFILES.items():
 
     if user:
         existing = (
-            db.query(CandidateProfile)
-            .filter(CandidateProfile.user_id == user.user_id)
+            db.query(Candidate)
+            .filter(Candidate.user_id == user.user_id)
             .first()
         )
 
         if not existing:
             db.add(
-                CandidateProfile(
+                Candidate(
                     user_id=user.user_id,
                     phone=profile["phone"],
                     skills=profile["skills"],
