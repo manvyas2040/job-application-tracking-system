@@ -166,7 +166,3 @@ def restore_user(
     return {"message": "User restored"}
 
 
-@router.post("/seed")
-def seed_data():
-    import seed
-    return {"message": "Seed executed"}
