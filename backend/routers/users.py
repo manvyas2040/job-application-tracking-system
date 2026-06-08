@@ -164,3 +164,9 @@ def restore_user(
     _audit(db, actor.user_id, f"user_restored:{user_id}")
     db.commit()
     return {"message": "User restored"}
+
+
+@router.post("/seed")
+def seed_data():
+    import seed
+    return {"message": "Seed executed"}
